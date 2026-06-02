@@ -1,0 +1,6 @@
+sample_id	type	condition	replicate	fastq_r1	fastq_r2	control
+Input_rep1	control	control	1	data/raw/Input_rep1_R1.fastq.gz	data/raw/Input_rep1_R2.fastq.gz	
+H3K27ac_rep1	chip	treated	1	data/raw/H3K27ac_rep1_R1.fastq.gz	data/raw/H3K27ac_rep1_R2.fastq.gz	Input_rep1
+H3K27ac_rep2	chip	treated	2	data/raw/H3K27ac_rep2_R1.fastq.gz	data/raw/H3K27ac_rep2_R2.fastq.gz	Input_rep1
+RNA_rep1	rna	treated	1	data/raw/RNA_rep1_R1.fastq.gz	data/raw/RNA_rep1_R2.fastq.gz	
+RNA_rep2	rna	treated	2	data/raw/RNA_rep2_R1.fastq.gz	data/raw/RNA_rep2_R2.fastq.gz	

@@ -5,8 +5,10 @@ A reproducible `Snakemake` workflow for histone ChIP-seq, RNA-seq transcription 
 ## Repository structure
 - `Snakefile` — main Snakemake workflow
 - `config.yaml` — species references, sample definitions, design metadata
+- `config.sample.yaml` — example config template
+- `sample_manifest.tsv` — example sample manifest for config generation
 - `envs/` — Conda environment definitions for bioinformatics and R analysis
-- `scripts/` — Python helper for building sample sheets
+- `scripts/` — helpers for building sample sheets, reference downloads, reports, and manifest-driven configs
 - `analysis/` — R analysis scripts for DiffBind, DESeq2, integrative analysis, and motif summaries
 - `.gitignore` — files and folders excluded from Git tracking
 
@@ -71,6 +73,33 @@ Rscript analysis/integrative_analysis.R results/diffbind/diffbind_summary.csv re
 - `snakemake results/diffbind/sample_sheet.csv` generates sample metadata files
 - `snakemake results/peaks/consensus_peaks.bed` creates a merged peak set for deepTools
 - `snakemake results/integrative/integrative_scatter.pdf` runs the final integrative step
+- `snakemake results/report/snakemake_report.html` generates a Snakemake HTML report of workflow execution
+
+## Sample manifest and config generation
+1. Edit `sample_manifest.tsv` with your sample names and file paths.
+2. Generate `config.yaml` from the manifest:
+```bash
+python3 scripts/manifest_to_config.py sample_manifest.tsv \
+  --species human \
+  --genome /path/to/hg38.fa \
+  --annotation /path/to/hg38.gtf \
+  --transcriptome /path/to/hg38.transcripts.fa \
+  --chrom-sizes /path/to/hg38.chrom.sizes \
+  --bt2-index /path/to/hg38 \
+  --black-list /path/to/hg38-blacklist.v2.bed \
+  --output config.yaml
+```
+
+## Reference download helper
+Use the species-specific helper to download common reference files and build indexes:
+```bash
+python3 scripts/download_references.py human --outdir references --build-salmon
+```
+
+## Generate a combined Snakemake report
+```bash
+snakemake --use-conda --cores 12 results/report/snakemake_report.html
+```
 
 ## Expected outputs
 - `results/fastqc/` — QC reports

@@ -1,0 +1,2 @@
+RuleException in file "/home/epigenetics/Desktop/oracle-histone-chip/Snakefile", line 40:
+Only input files can be specified as functions

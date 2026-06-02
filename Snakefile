@@ -39,28 +39,40 @@ rule all:
 
 rule fastqc_raw:
     input:
-        lambda wc: FASTQ[wc.sample]
+        R1=lambda wc: FASTQ[wc.sample][0],
+        R2=lambda wc: FASTQ[wc.sample][1]
     output:
-        html=expand("results/fastqc/raw/{fq_basename}_fastqc.html", fq_basename=lambda wildcards: [Path(f).name.replace(".fastq.gz", "") for f in FASTQ[wildcards.sample]]),
-        zip=expand("results/fastqc/raw/{fq_basename}_fastqc.zip", fq_basename=lambda wildcards: [Path(f).name.replace(".fastq.gz", "") for f in FASTQ[wildcards.sample]])
+        "results/fastqc/raw/{sample}_R1_fastqc.html",
+        "results/fastqc/raw/{sample}_R1_fastqc.zip",
+        "results/fastqc/raw/{sample}_R2_fastqc.html",
+        "results/fastqc/raw/{sample}_R2_fastqc.zip"
     threads: 2
+    log:
+        "results/logs/fastqc_raw_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        fastqc -o results/fastqc/raw -t {threads} {input}
+        fastqc -o results/fastqc/raw -t {threads} {input.R1} {input.R2} > {log} 2>&1
         """
 
 rule trim_galore:
     input:
-        lambda wc: FASTQ[wc.sample]
+        R1=lambda wc: FASTQ[wc.sample][0],
+        R2=lambda wc: FASTQ[wc.sample][1]
     output:
         trimmed1="results/trimmed/{sample}_R1_val_1.fq.gz",
         trimmed2="results/trimmed/{sample}_R2_val_2.fq.gz"
     params:
-        outdir="results/trimmed"
+        outdir=lambda wc, output: os.path.dirname(str(output.trimmed1))
     threads: 4
+    log:
+        "results/logs/trim_galore_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        trim_galore --paired --cores {threads} --output_dir {params.outdir} {input[0]} {input[1]}
+        trim_galore --paired --cores {threads} --output_dir {params.outdir} {input.R1} {input.R2} > {log} 2>&1
         """
 
 rule align_bowtie2:
@@ -72,9 +84,13 @@ rule align_bowtie2:
     threads: 8
     params:
         index=REF["bt2_index"]
+    log:
+        "results/logs/bowtie2_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        bowtie2 -x {params.index} -1 {input.trimmed1} -2 {input.trimmed2} -p {threads} 2> results/bam/{wildcards.sample}.bowtie2.log | samtools view -bS - > {output}
+        bowtie2 -x {params.index} -1 {input.trimmed1} -2 {input.trimmed2} -p {threads} 2> {log} | samtools view -bS - > {output}
         """
 
 rule sort_markdup:
@@ -84,12 +100,16 @@ rule sort_markdup:
         bam="results/bam/{sample}.sorted.bam",
         bai="results/bam/{sample}.sorted.bam.bai"
     threads: 4
+    log:
+        "results/logs/sort_markdup_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        samtools sort -@ {threads} -o results/bam/{wildcards.sample}.sorted.raw.bam {input.bam}
-        samtools fixmate -m results/bam/{wildcards.sample}.sorted.raw.bam results/bam/{wildcards.sample}.fixmate.bam
-        samtools markdup -r results/bam/{wildcards.sample}.fixmate.bam {output.bam}
-        samtools index {output.bam}
+        samtools sort -@ {threads} -o results/bam/{wildcards.sample}.sorted.raw.bam {input.bam} >> {log} 2>&1
+        samtools fixmate -m results/bam/{wildcards.sample}.sorted.raw.bam results/bam/{wildcards.sample}.fixmate.bam >> {log} 2>&1
+        samtools markdup -r results/bam/{wildcards.sample}.fixmate.bam {output.bam} >> {log} 2>&1
+        samtools index {output.bam} >> {log} 2>&1
         rm -f results/bam/{wildcards.sample}.sorted.raw.bam
         """
 
@@ -101,9 +121,13 @@ rule call_peaks:
         broadpeak="results/peaks/{sample}_peaks.broadPeak"
     params:
         gsize=REF["gsize"]
+    log:
+        "results/logs/macs2_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        macs2 callpeak -t {input.bam} -c {input.control} --format BAMPE --name {wildcards.sample} --broad --broad-cutoff 0.1 --gsize {params.gsize} --outdir results/peaks
+        macs2 callpeak -t {input.bam} -c {input.control} --format BAMPE --name {wildcards.sample} --broad --broad-cutoff 0.1 --gsize {params.gsize} --outdir results/peaks > {log} 2>&1
         """
 
 rule merge_peaks:
@@ -111,9 +135,13 @@ rule merge_peaks:
         PEAKS
     output:
         "results/peaks/consensus_peaks.bed"
+    log:
+        "results/logs/merge_peaks.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        cat {input} | sort -k1,1 -k2,2n | bedtools merge > {output}
+        cat {input} | sort -k1,1 -k2,2n | bedtools merge > {output} 2> {log}
         """
 
 rule bamcoverage:
@@ -122,9 +150,15 @@ rule bamcoverage:
     output:
         bw="results/bigwig/{sample}.bw"
     threads: 4
+    params:
+        gsize=REF["gsize"]
+    log:
+        "results/logs/bamcoverage_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        bamCoverage -b {input.bam} -o {output.bw} --normalizeUsing RPGC --effectiveGenomeSize {REF["gsize"]} --binSize 25 --extendReads 200
+        bamCoverage -b {input.bam} -o {output.bw} --normalizeUsing RPGC --effectiveGenomeSize {params.gsize} --binSize 25 --extendReads 200 > {log} 2>&1
         """
 
 rule deeptools_matrix:
@@ -133,9 +167,13 @@ rule deeptools_matrix:
         peaks="results/peaks/consensus_peaks.bed"
     output:
         "results/deeptools/matrix.gz"
+    log:
+        "results/logs/deeptools_matrix.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        computeMatrix scale-regions -S {input.bigwigs} -R {input.peaks} --regionBodyLength 10000 --beforeRegionStartLength 2000 --afterRegionStartLength 2000 --skipZeros -o {output}
+        computeMatrix scale-regions -S {input.bigwigs} -R {input.peaks} --regionBodyLength 10000 --beforeRegionStartLength 2000 --afterRegionStartLength 2000 --skipZeros -o {output} > {log} 2>&1
         """
 
 rule deeptools_heatmap:
@@ -143,9 +181,13 @@ rule deeptools_heatmap:
         matrix="results/deeptools/matrix.gz"
     output:
         "results/deeptools/heatmap.png"
+    log:
+        "results/logs/deeptools_heatmap.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        plotHeatmap -m {input.matrix} -out {output} --plotTitle "ChIP-seq signal heatmap" --colorMap RdBu
+        plotHeatmap -m {input.matrix} -out {output} --plotTitle "ChIP-seq signal heatmap" --colorMap RdBu > {log} 2>&1
         """
 
 rule deeptools_profile:
@@ -153,9 +195,13 @@ rule deeptools_profile:
         matrix="results/deeptools/matrix.gz"
     output:
         "results/deeptools/profile.png"
+    log:
+        "results/logs/deeptools_profile.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
-        plotProfile -m {input.matrix} -out {output} --plotTitle "ChIP-seq meta-profile"
+        plotProfile -m {input.matrix} -out {output} --plotTitle "ChIP-seq meta-profile" > {log} 2>&1
         """
 
 rule build_sample_sheets:
@@ -164,6 +210,10 @@ rule build_sample_sheets:
     output:
         diffbind="results/diffbind/sample_sheet.csv",
         rna="results/rnaseq/sample_metadata.tsv"
+    log:
+        "results/logs/build_sample_sheets.log"
+    conda:
+        "envs/chipseq.yaml"
     script:
         "scripts/build_sample_sheets.py"
 
@@ -173,12 +223,16 @@ rule homer_motif:
     output:
         "results/motifs/homer/knownResults.txt"
     params:
-        outdir="results/motifs/homer",
+        outdir=lambda wc, output: os.path.dirname(str(output)),
         genome=REF["name"]
+    log:
+        "results/logs/homer_motif.log"
+    conda:
+        "envs/chipseq.yaml"
     shell:
         """
         mkdir -p {params.outdir}
-        findMotifsGenome.pl {input.peaks} {params.genome} {params.outdir} -size 200 -len 8,10,12
+        findMotifsGenome.pl {input.peaks} {params.genome} {params.outdir} -size 200 -len 8,10,12 > {log} 2>&1
         """
 
 rule run_diffbind:
@@ -189,11 +243,15 @@ rule run_diffbind:
     output:
         summary="results/diffbind/diffbind_summary.csv"
     params:
-        outdir="results/diffbind"
+        outdir=lambda wc, output: os.path.dirname(str(output.summary))
+    log:
+        "results/logs/diffbind.log"
+    conda:
+        "envs/r_analysis.yaml"
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript analysis/diffbind_analysis.R {input.sheet} {params.outdir}
+        Rscript analysis/diffbind_analysis.R {input.sheet} {params.outdir} > {log} 2>&1
         """
 
 rule motif_summary:
@@ -201,9 +259,13 @@ rule motif_summary:
         homer="results/motifs/homer/knownResults.txt"
     output:
         "results/motifs/motif_summary.pdf"
+    log:
+        "results/logs/motif_summary.log"
+    conda:
+        "envs/r_analysis.yaml"
     shell:
         """
-        Rscript analysis/motif_summary.R {input.homer} results/motifs
+        Rscript analysis/motif_summary.R {input.homer} results/motifs > {log} 2>&1
         """
 
 rule salmon_index:
@@ -212,9 +274,13 @@ rule salmon_index:
     output:
         touch("results/rnaseq/salmon_index.done")
     threads: 4
+    log:
+        "results/logs/salmon_index.log"
+    conda:
+        "envs/rna_seq.yaml"
     shell:
         """
-        salmon index -t {input.transcriptome} -i results/rnaseq/salmon_index --type quasi
+        salmon index -t {input.transcriptome} -i results/rnaseq/salmon_index --type quasi > {log} 2>&1
         touch {output}
         """
 
@@ -226,11 +292,15 @@ rule salmon_quant:
     output:
         "results/rnaseq/salmon/{sample}/quant.sf"
     params:
-        outdir="results/rnaseq/salmon/{sample}"
+        outdir=lambda wc, output: os.path.dirname(str(output)),
     threads: 8
+    log:
+        "results/logs/salmon_quant_{sample}.log"
+    conda:
+        "envs/rna_seq.yaml"
     shell:
         """
-        salmon quant -i results/rnaseq/salmon_index -l A -1 {input.fastq1} -2 {input.fastq2} -p {threads} -o {params.outdir}
+        salmon quant -i results/rnaseq/salmon_index -l A -1 {input.fastq1} -2 {input.fastq2} -p {threads} -o {params.outdir} > {log} 2>&1
         """
 
 rule rnaseq_deseq2:
@@ -241,11 +311,15 @@ rule rnaseq_deseq2:
         results="results/rnaseq/deseq2_results.tsv",
         plot="results/rnaseq/deseq2_plots.pdf"
     params:
-        outdir="results/rnaseq"
+        outdir=lambda wc, output: os.path.dirname(str(output.results))
+    log:
+        "results/logs/rnaseq_deseq2.log"
+    conda:
+        "envs/r_analysis.yaml"
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript analysis/rnaseq_DE.R {input.metadata} {params.outdir} {output.results} {output.plot}
+        Rscript analysis/rnaseq_DE.R {input.metadata} {params.outdir} {output.results} {output.plot} > {log} 2>&1
         """
 
 rule integrative_analysis:
@@ -257,9 +331,30 @@ rule integrative_analysis:
         summary="results/integrative/integrative_summary.csv",
         plot="results/integrative/integrative_scatter.pdf"
     params:
-        outdir="results/integrative"
+        outdir=lambda wc, output: os.path.dirname(str(output.summary))
+    log:
+        "results/logs/integrative_analysis.log"
+    conda:
+        "envs/r_analysis.yaml"
     shell:
         """
         mkdir -p {params.outdir}
-        Rscript analysis/integrative_analysis.R {input.diffbind} {input.deseq} {input.annotation} {params.outdir}
+        Rscript analysis/integrative_analysis.R {input.diffbind} {input.deseq} {input.annotation} {params.outdir} > {log} 2>&1
+        """
+
+rule snakemake_report:
+    input:
+        "results/peaks/consensus_peaks.bed",
+        "results/diffbind/diffbind_summary.csv",
+        "results/rnaseq/deseq2_results.tsv"
+    output:
+        "results/report/snakemake_report.html"
+    log:
+        "results/report/snakemake_report.log"
+    conda:
+        "envs/chipseq.yaml"
+    shell:
+        """
+        mkdir -p results/report
+        snakemake --snakefile Snakefile --configfile config.yaml --report {output} --nolock > {log} 2>&1
         """
