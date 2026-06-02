@@ -4,6 +4,9 @@ configfile: "config.yaml"
 
 SPECIES = config["species"]
 REF = config["references"][SPECIES]
+CONTAMINATION = config.get("contamination", {})
+FASTQ_SCREEN_CONF = CONTAMINATION.get("fastq_screen_conf", "config/fastq_screen.conf.example")
+FASTQ_SCREEN_SUBSET = CONTAMINATION.get("subset", 100000)
 
 CHIP_SAMPLES = [s["id"] for s in config["chip_samples"]]
 CHIP_CONTROLS = {c["id"]: c for c in config["chip_controls"]}
@@ -12,14 +15,23 @@ ALL_SAMPLES = CHIP_SAMPLES + list(CHIP_CONTROLS.keys())
 FASTQ = {s["id"]: s["fastq"] for s in config["chip_samples"] + config["chip_controls"]}
 CONTROL_MAP = {s["id"]: s["control"] for s in config["chip_samples"]}
 
+RAW_FASTQC_HTML = expand("results/fastqc/raw/{sample}_{read}_fastqc.html", sample=ALL_SAMPLES, read=["R1", "R2"])
+RAW_FASTQC_ZIP = expand("results/fastqc/raw/{sample}_{read}_fastqc.zip", sample=ALL_SAMPLES, read=["R1", "R2"])
+TRIMMED_FASTQC_HTML = expand("results/fastqc/trimmed/{sample}_R1_val_1_fastqc.html", sample=ALL_SAMPLES) + expand("results/fastqc/trimmed/{sample}_R2_val_2_fastqc.html", sample=ALL_SAMPLES)
+TRIMMED_FASTQC_ZIP = expand("results/fastqc/trimmed/{sample}_R1_val_1_fastqc.zip", sample=ALL_SAMPLES) + expand("results/fastqc/trimmed/{sample}_R2_val_2_fastqc.zip", sample=ALL_SAMPLES)
+FASTQ_SCREEN_TEXT = expand("results/contamination/fastq_screen/{sample}_{read}_screen.txt", sample=ALL_SAMPLES, read=["R1", "R2"])
+FASTQ_SCREEN_HTML = expand("results/contamination/fastq_screen/{sample}_{read}_screen.html", sample=ALL_SAMPLES, read=["R1", "R2"])
 PEAKS = expand("results/peaks/{sample}_peaks.broadPeak", sample=CHIP_SAMPLES)
 BIGWIGS = expand("results/bigwig/{sample}.bw", sample=CHIP_SAMPLES)
+MULTIQC_REPORT = "results/multiqc/multiqc_report.html"
 
 
 rule all:
     input:
-        expand("results/fastqc/raw/{sample}_R1_fastqc.html", sample=ALL_SAMPLES),
-        expand("results/fastqc/trimmed/{sample}_R1_val_1_fastqc.html", sample=ALL_SAMPLES),
+        RAW_FASTQC_HTML,
+        TRIMMED_FASTQC_HTML,
+        FASTQ_SCREEN_TEXT,
+        FASTQ_SCREEN_HTML,
         expand("results/bam/{sample}.sorted.bam.bai", sample=ALL_SAMPLES),
         PEAKS,
         BIGWIGS,
@@ -31,7 +43,8 @@ rule all:
         "results/diffbind/diffbind_plots.pdf",
         "results/diffbind/diffbind.rds",
         "results/motifs/homer/knownResults.txt",
-        "results/motifs/motif_summary.pdf"
+        "results/motifs/motif_summary.pdf",
+        MULTIQC_REPORT
 
 
 rule fastqc_raw:
@@ -55,6 +68,35 @@ rule fastqc_raw:
         """
 
 
+rule fastq_screen_raw:
+    input:
+        R1=lambda wc: FASTQ[wc.sample][0],
+        R2=lambda wc: FASTQ[wc.sample][1],
+        conf=FASTQ_SCREEN_CONF
+    output:
+        R1txt="results/contamination/fastq_screen/{sample}_R1_screen.txt",
+        R1html="results/contamination/fastq_screen/{sample}_R1_screen.html",
+        R2txt="results/contamination/fastq_screen/{sample}_R2_screen.txt",
+        R2html="results/contamination/fastq_screen/{sample}_R2_screen.html"
+    params:
+        outdir="results/contamination/fastq_screen",
+        subset=FASTQ_SCREEN_SUBSET
+    threads: 4
+    log:
+        "results/logs/fastq_screen_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
+    shell:
+        """
+        mkdir -p {params.outdir} results/logs
+        tmpdir=$(mktemp -d {params.outdir}/tmp.{wildcards.sample}.XXXXXX)
+        trap 'rm -rf "$tmpdir"' EXIT
+        ln -sf "$(readlink -f {input.R1})" "$tmpdir/{wildcards.sample}_R1.fastq.gz"
+        ln -sf "$(readlink -f {input.R2})" "$tmpdir/{wildcards.sample}_R2.fastq.gz"
+        fastq_screen --conf {input.conf} --aligner bowtie2 --threads {threads} --subset {params.subset} --outdir {params.outdir} "$tmpdir/{wildcards.sample}_R1.fastq.gz" "$tmpdir/{wildcards.sample}_R2.fastq.gz" > {log} 2>&1
+        """
+
+
 rule trim_galore:
     input:
         R1=lambda wc: FASTQ[wc.sample][0],
@@ -73,6 +115,27 @@ rule trim_galore:
         """
         mkdir -p {params.outdir} results/logs
         trim_galore --paired --cores {threads} --output_dir {params.outdir} {input.R1} {input.R2} > {log} 2>&1
+        """
+
+
+rule fastqc_trimmed:
+    input:
+        R1="results/trimmed/{sample}_R1_val_1.fq.gz",
+        R2="results/trimmed/{sample}_R2_val_2.fq.gz"
+    output:
+        "results/fastqc/trimmed/{sample}_R1_val_1_fastqc.html",
+        "results/fastqc/trimmed/{sample}_R1_val_1_fastqc.zip",
+        "results/fastqc/trimmed/{sample}_R2_val_2_fastqc.html",
+        "results/fastqc/trimmed/{sample}_R2_val_2_fastqc.zip"
+    threads: 2
+    log:
+        "results/logs/fastqc_trimmed_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
+    shell:
+        """
+        mkdir -p results/fastqc/trimmed results/logs
+        fastqc -o results/fastqc/trimmed -t {threads} {input.R1} {input.R2} > {log} 2>&1
         """
 
 
@@ -313,12 +376,40 @@ rule motif_summary:
         """
 
 
+rule multiqc:
+    input:
+        RAW_FASTQC_ZIP,
+        TRIMMED_FASTQC_ZIP,
+        FASTQ_SCREEN_TEXT,
+        FASTQ_SCREEN_HTML,
+        expand("results/bam/{sample}.sorted.bam.bai", sample=ALL_SAMPLES),
+        PEAKS,
+        BIGWIGS,
+        "results/peaks/consensus_peaks.bed",
+        "results/diffbind/diffbind_summary.csv",
+        "results/diffbind/diffbind_plots.pdf",
+        "results/motifs/homer/knownResults.txt",
+        "results/motifs/motif_summary.pdf"
+    output:
+        html=MULTIQC_REPORT
+    log:
+        "results/logs/multiqc.log"
+    conda:
+        "envs/chipseq.yaml"
+    shell:
+        """
+        mkdir -p results/multiqc results/logs
+        multiqc results --outdir results/multiqc --filename multiqc_report.html --force > {log} 2>&1
+        """
+
+
 rule snakemake_report:
     input:
         "results/peaks/consensus_peaks.bed",
         "results/diffbind/diffbind_summary.csv",
         "results/diffbind/diffbind_plots.pdf",
-        "results/motifs/motif_summary.pdf"
+        "results/motifs/motif_summary.pdf",
+        MULTIQC_REPORT
     output:
         "results/report/snakemake_report.html"
     threads: 1

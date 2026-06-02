@@ -23,6 +23,10 @@ references:
     name: "rn6"
     gsize: "2.53e9"
 
+contamination:
+  fastq_screen_conf: "config/fastq_screen.conf.example"
+  subset: 100000
+
 chip_controls:
   - id: Input_control_rep1
     fastq:

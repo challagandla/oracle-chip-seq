@@ -11,6 +11,9 @@ references/
 *.fastq.gz
 *.fq.gz
 
+# Local FastQ Screen config with site-specific index paths
+config/fastq_screen.conf
+
 # Python artifacts
 __pycache__/
 *.pyc

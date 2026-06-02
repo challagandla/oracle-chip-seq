@@ -14,6 +14,8 @@ dependencies:
   - macs2
   - deeptools
   - homer
+  - fastq-screen
+  - multiqc
   - wget
   - pandas
   - pyyaml
