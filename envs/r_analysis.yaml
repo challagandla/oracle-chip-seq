@@ -5,18 +5,7 @@ channels:
   - defaults
 dependencies:
   - r-base=4.3
-  - r-diffbind
-  - r-deseq2
-  - r-tximport
+  - bioconductor-diffbind
   - r-ggplot2
-  - r-pheatmap
   - r-readr
   - r-dplyr
-  - r-tidyr
-  - r-optparse
-  - r-chipseeker
-  - r-genomicfeatures
-  - r-rtracklayer
-  - r-genomicranges
-  - r-java
-  - r-BiocManager

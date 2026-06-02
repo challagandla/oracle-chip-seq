@@ -1,6 +1,15 @@
 # Results and temporary files
 results/
 
+# Raw and intermediate data
+data/raw/
+references/
+*.bam
+*.bai
+*.bw
+*.fastq.gz
+*.fq.gz
+
 # Python artifacts
 __pycache__/
 *.pyc
