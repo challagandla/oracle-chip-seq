@@ -1,0 +1,18 @@
+# Results and temporary files
+results/
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# R artifacts
+*.Rhistory
+*.RData
+.Rproj.user/
+
+# Conda environment artifacts
+.env/
+.venv/
+
+# OS files
+.DS_Store

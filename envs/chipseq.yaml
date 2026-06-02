@@ -1,0 +1,19 @@
+name: chipseq
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - snakemake
+  - fastqc
+  - trim-galore
+  - bowtie2
+  - samtools
+  - bedtools
+  - macs2
+  - deeptools
+  - homer
+  - salmon
+  - pandas
+  - pyyaml

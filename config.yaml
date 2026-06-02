@@ -1,0 +1,66 @@
+species: human
+
+references:
+  human:
+    genome: "/path/to/hg38.fa"
+    annotation: "/path/to/hg38.gtf"
+    transcriptome: "/path/to/hg38.transcripts.fa"
+    chrom_sizes: "/path/to/hg38.chrom.sizes"
+    black_list: "/path/to/hg38-blacklist.v2.bed"
+    bt2_index: "/path/to/hg38"
+    name: "hg38"
+    gsize: "2.7e9"
+  mouse:
+    genome: "/path/to/mm10.fa"
+    annotation: "/path/to/mm10.gtf"
+    transcriptome: "/path/to/mm10.transcripts.fa"
+    chrom_sizes: "/path/to/mm10.chrom.sizes"
+    black_list: "/path/to/mm10-blacklist.v2.bed"
+    bt2_index: "/path/to/mm10"
+    name: "mm10"
+    gsize: "1.87e9"
+  rat:
+    genome: "/path/to/rn6.fa"
+    annotation: "/path/to/rn6.gtf"
+    transcriptome: "/path/to/rn6.transcripts.fa"
+    chrom_sizes: "/path/to/rn6.chrom.sizes"
+    black_list: "/path/to/rn6-blacklist.bed"
+    bt2_index: "/path/to/rn6"
+    name: "rn6"
+    gsize: "2.53e9"
+
+chip_controls:
+  - id: Input_rep1
+    fastq:
+      - data/raw/Input_rep1_R1.fastq.gz
+      - data/raw/Input_rep1_R2.fastq.gz
+
+chip_samples:
+  - id: H3K27ac_rep1
+    fastq:
+      - data/raw/H3K27ac_rep1_R1.fastq.gz
+      - data/raw/H3K27ac_rep1_R2.fastq.gz
+    control: Input_rep1
+    condition: treated
+    replicate: 1
+  - id: H3K27ac_rep2
+    fastq:
+      - data/raw/H3K27ac_rep2_R1.fastq.gz
+      - data/raw/H3K27ac_rep2_R2.fastq.gz
+    control: Input_rep1
+    condition: treated
+    replicate: 2
+
+rna_samples:
+  - id: RNA_rep1
+    fastq:
+      - data/raw/RNA_rep1_R1.fastq.gz
+      - data/raw/RNA_rep1_R2.fastq.gz
+    condition: treated
+    replicate: 1
+  - id: RNA_rep2
+    fastq:
+      - data/raw/RNA_rep2_R1.fastq.gz
+      - data/raw/RNA_rep2_R2.fastq.gz
+    condition: treated
+    replicate: 2
