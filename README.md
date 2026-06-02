@@ -5,11 +5,12 @@ A reproducible `Snakemake` workflow for histone ChIP-seq quality control, paired
 ## Repository structure
 - `Snakefile` - main Snakemake workflow
 - `config.yaml` - species references, ChIP-seq sample definitions, and design metadata
-- `config.sample.yaml` - example config template
+- `config.sample.yaml` - example config template with a valid two-condition, two-replicate DiffBind design
 - `sample_manifest.tsv` - example manifest for config generation
 - `envs/` - Conda environment definitions for ChIP-seq processing and R analysis
 - `scripts/` - helpers for building DiffBind sample sheets, reference downloads, and manifest-driven configs
 - `analysis/` - R analysis scripts for DiffBind and motif summaries
+- `AUDIT.md` - end-to-end audit checklist and validation notes
 - `.gitignore` - files and folders excluded from Git tracking
 - `LICENSE` - MIT license
 
@@ -62,6 +63,7 @@ If you already have Snakemake installed in a separate environment, for example:
 ### 5. Run only R analysis steps
 ```bash
 conda activate r_analysis
+python3 scripts/build_sample_sheets.py --config config.yaml --diffbind results/diffbind/sample_sheet.csv
 Rscript analysis/diffbind_analysis.R results/diffbind/sample_sheet.csv results/diffbind
 Rscript analysis/motif_summary.R results/motifs/homer/knownResults.txt results/motifs
 ```

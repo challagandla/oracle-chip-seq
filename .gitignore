@@ -1,5 +1,6 @@
 # Results and temporary files
 results/
+.snakemake/
 
 # Raw and intermediate data
 data/raw/

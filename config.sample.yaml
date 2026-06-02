@@ -14,10 +14,18 @@ chip_controls:
     fastq:
       - data/raw/Input_control_rep1_R1.fastq.gz
       - data/raw/Input_control_rep1_R2.fastq.gz
+  - id: Input_control_rep2
+    fastq:
+      - data/raw/Input_control_rep2_R1.fastq.gz
+      - data/raw/Input_control_rep2_R2.fastq.gz
   - id: Input_treated_rep1
     fastq:
       - data/raw/Input_treated_rep1_R1.fastq.gz
       - data/raw/Input_treated_rep1_R2.fastq.gz
+  - id: Input_treated_rep2
+    fastq:
+      - data/raw/Input_treated_rep2_R1.fastq.gz
+      - data/raw/Input_treated_rep2_R2.fastq.gz
 
 chip_samples:
   - id: H3K27ac_control_rep1
@@ -29,6 +37,15 @@ chip_samples:
     replicate: 1
     factor: H3K27ac
     tissue: example
+  - id: H3K27ac_control_rep2
+    fastq:
+      - data/raw/H3K27ac_control_rep2_R1.fastq.gz
+      - data/raw/H3K27ac_control_rep2_R2.fastq.gz
+    control: Input_control_rep2
+    condition: control
+    replicate: 2
+    factor: H3K27ac
+    tissue: example
   - id: H3K27ac_treated_rep1
     fastq:
       - data/raw/H3K27ac_treated_rep1_R1.fastq.gz
@@ -36,5 +53,14 @@ chip_samples:
     control: Input_treated_rep1
     condition: treated
     replicate: 1
+    factor: H3K27ac
+    tissue: example
+  - id: H3K27ac_treated_rep2
+    fastq:
+      - data/raw/H3K27ac_treated_rep2_R1.fastq.gz
+      - data/raw/H3K27ac_treated_rep2_R2.fastq.gz
+    control: Input_treated_rep2
+    condition: treated
+    replicate: 2
     factor: H3K27ac
     tissue: example

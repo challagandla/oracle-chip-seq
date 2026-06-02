@@ -12,7 +12,6 @@ ALL_SAMPLES = CHIP_SAMPLES + list(CHIP_CONTROLS.keys())
 FASTQ = {s["id"]: s["fastq"] for s in config["chip_samples"] + config["chip_controls"]}
 CONTROL_MAP = {s["id"]: s["control"] for s in config["chip_samples"]}
 
-RAW_PEAKS = expand("results/peaks/raw/{sample}_peaks.broadPeak", sample=CHIP_SAMPLES)
 PEAKS = expand("results/peaks/{sample}_peaks.broadPeak", sample=CHIP_SAMPLES)
 BIGWIGS = expand("results/bigwig/{sample}.bw", sample=CHIP_SAMPLES)
 
@@ -250,8 +249,11 @@ rule build_sample_sheets:
         "results/logs/build_sample_sheets.log"
     conda:
         "envs/chipseq.yaml"
-    script:
-        "scripts/build_sample_sheets.py"
+    shell:
+        """
+        mkdir -p results/diffbind results/logs
+        python3 scripts/build_sample_sheets.py --config {input.config} --diffbind {output.diffbind} > {log} 2>&1
+        """
 
 
 rule homer_motif:
@@ -319,6 +321,7 @@ rule snakemake_report:
         "results/motifs/motif_summary.pdf"
     output:
         "results/report/snakemake_report.html"
+    threads: 1
     log:
         "results/report/snakemake_report.log"
     conda:
@@ -326,5 +329,5 @@ rule snakemake_report:
     shell:
         """
         mkdir -p results/report
-        snakemake --snakefile Snakefile --configfile config.yaml --report {output} --nolock > {log} 2>&1
+        snakemake --snakefile Snakefile --configfile config.yaml --use-conda --cores {threads} --report {output} --nolock > {log} 2>&1
         """

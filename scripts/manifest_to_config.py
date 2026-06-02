@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+from collections import Counter
+
 import yaml
 
 REQUIRED_COLUMNS = ["sample_id", "type", "condition", "replicate", "fastq_r1", "fastq_r2"]
-OPTIONAL_COLUMNS = ["control", "mark", "factor", "tissue", "peak_caller"]
 SPECIES_META = {
     "human": {"name": "hg38", "gsize": "2.7e9"},
-    "mouse": {"name": "mm10", "gsize": "1.87e9"},
+    "mouse": {"name": "mm39", "gsize": "1.87e9"},
     "rat": {"name": "rn6", "gsize": "2.53e9"},
 }
 
@@ -20,11 +21,15 @@ def parse_manifest(path):
     rows = []
     with open(path, newline="") as fh:
         reader = csv.DictReader(fh, delimiter="\t")
+        if reader.fieldnames is None:
+            raise ValueError("Manifest is empty")
         missing = [c for c in REQUIRED_COLUMNS if c not in reader.fieldnames]
         if missing:
             raise ValueError(f"Missing manifest columns: {', '.join(missing)}")
         for row in reader:
             rows.append({k: clean(row.get(k)) for k in reader.fieldnames})
+    if not rows:
+        raise ValueError("Manifest contains no sample rows")
     return rows
 
 
@@ -44,12 +49,51 @@ def sample_from_row(row):
     return sample
 
 
+def validate_design(chip_controls, chip_samples):
+    if not chip_controls:
+        raise ValueError("Manifest must contain at least one ChIP input/control sample")
+    if not chip_samples:
+        raise ValueError("Manifest must contain at least one ChIP sample")
+
+    ids = [item["id"] for item in chip_controls + chip_samples]
+    duplicate_ids = sorted([sample_id for sample_id, count in Counter(ids).items() if count > 1])
+    if duplicate_ids:
+        raise ValueError(f"Duplicate sample IDs found: {', '.join(duplicate_ids)}")
+
+    control_ids = {control["id"] for control in chip_controls}
+    missing_controls = sorted(
+        {
+            sample.get("control", "")
+            for sample in chip_samples
+            if not sample.get("control") or sample.get("control") not in control_ids
+        }
+    )
+    if missing_controls:
+        raise ValueError(f"Unknown or missing ChIP control IDs: {', '.join(missing_controls)}")
+
+    condition_counts = Counter(sample["condition"] for sample in chip_samples)
+    if len(condition_counts) < 2:
+        raise ValueError("Differential binding requires at least two ChIP-seq conditions")
+    low_rep_conditions = sorted(condition for condition, count in condition_counts.items() if count < 2)
+    if low_rep_conditions:
+        raise ValueError(
+            "Differential binding requires at least two ChIP-seq replicates per condition; "
+            f"insufficient replicates for: {', '.join(low_rep_conditions)}"
+        )
+
+
 def build_config(rows, species, genome, chrom_sizes, bt2_index, black_list):
     chip_controls = []
     chip_samples = []
 
     for row in rows:
         sample_type = row["type"].lower()
+        if sample_type in {"rna", "rnaseq", "rna-seq"}:
+            raise ValueError(
+                f"RNA-seq sample {row['sample_id']} is not supported. "
+                "This workflow is ChIP-seq differential binding only."
+            )
+
         sample = sample_from_row(row)
         if sample_type == "control":
             chip_controls.append(sample)
@@ -59,13 +103,10 @@ def build_config(rows, species, genome, chrom_sizes, bt2_index, black_list):
                 raise ValueError(f"ChIP sample {row['sample_id']} is missing a control")
             sample["control"] = control_id
             chip_samples.append(sample)
-        elif sample_type in {"rna", "rnaseq", "rna-seq"}:
-            raise ValueError(
-                f"RNA-seq sample {row['sample_id']} is not supported. "
-                "This workflow is ChIP-seq differential binding only."
-            )
         else:
             raise ValueError(f"Unknown type '{row['type']}' for sample {row['sample_id']}")
+
+    validate_design(chip_controls, chip_samples)
 
     return {
         "species": species,

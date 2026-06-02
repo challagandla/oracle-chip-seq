@@ -9,11 +9,11 @@ references:
     name: "hg38"
     gsize: "2.7e9"
   mouse:
-    genome: "/path/to/mm10.fa"
-    chrom_sizes: "/path/to/mm10.chrom.sizes"
-    black_list: "/path/to/mm10-blacklist.v2.bed"
-    bt2_index: "/path/to/mm10"
-    name: "mm10"
+    genome: "/path/to/mm39.fa"
+    chrom_sizes: "/path/to/mm39.chrom.sizes"
+    black_list: "/path/to/mm39-blacklist.v2.bed"
+    bt2_index: "/path/to/mm39"
+    name: "mm39"
     gsize: "1.87e9"
   rat:
     genome: "/path/to/rn6.fa"

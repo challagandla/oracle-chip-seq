@@ -10,13 +10,19 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 
-motifs <- read_tsv(homer_file, comment = "#", col_names = TRUE)
+motifs <- read_tsv(homer_file, comment = "#", col_names = TRUE, show_col_types = FALSE)
+names(motifs) <- make.names(names(motifs), unique = TRUE)
+
 if (!"Motif.Name" %in% colnames(motifs)) {
-    stop("Expected a Motif.Name column in HOMER results")
+    stop("Expected a Motif Name column in HOMER results")
+}
+if (!"P.value" %in% colnames(motifs)) {
+    stop("Expected a P-value column in HOMER results")
 }
 
 top_motifs <- motifs %>%
-    mutate(logP = -log10(P.value)) %>%
+    mutate(P.value = as.numeric(P.value), logP = -log10(P.value)) %>%
+    filter(!is.na(logP), is.finite(logP)) %>%
     arrange(desc(logP)) %>%
     slice_head(n = 20)
 

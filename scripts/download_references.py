@@ -9,7 +9,7 @@ SPECIES_CONFIG = {
         "fasta_url": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_50/GRCh38.primary_assembly.genome.fa.gz",
     },
     "mouse": {
-        "alias": "mm10",
+        "alias": "mm39",
         "fasta_url": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M30/GRCm39.primary_assembly.genome.fa.gz",
     },
     "rat": {
