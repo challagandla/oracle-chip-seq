@@ -53,6 +53,11 @@ conda activate chipseq
 snakemake --use-conda --cores 12
 ```
 
+If you already have Snakemake installed in a separate environment, for example:
+```bash
+/home/epigenetics/miniforge3/envs/snakemake/bin/snakemake --use-conda --cores 12
+```
+
 ### 5. Run only R analysis steps
 ```bash
 conda activate r_analysis
