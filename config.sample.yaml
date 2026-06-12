@@ -41,6 +41,7 @@ chip_samples:
     replicate: 1
     factor: H3K27ac
     tissue: example
+    mark_type: histone  # 'histone' -> MACS2 broad peaks, 'tf' -> narrow peaks
   - id: H3K27ac_control_rep2
     fastq:
       - data/raw/H3K27ac_control_rep2_R1.fastq.gz
@@ -50,6 +51,7 @@ chip_samples:
     replicate: 2
     factor: H3K27ac
     tissue: example
+    mark_type: histone  # 'histone' -> MACS2 broad peaks, 'tf' -> narrow peaks
   - id: H3K27ac_treated_rep1
     fastq:
       - data/raw/H3K27ac_treated_rep1_R1.fastq.gz
@@ -59,6 +61,7 @@ chip_samples:
     replicate: 1
     factor: H3K27ac
     tissue: example
+    mark_type: histone  # 'histone' -> MACS2 broad peaks, 'tf' -> narrow peaks
   - id: H3K27ac_treated_rep2
     fastq:
       - data/raw/H3K27ac_treated_rep2_R1.fastq.gz
@@ -68,3 +71,4 @@ chip_samples:
     replicate: 2
     factor: H3K27ac
     tissue: example
+    mark_type: histone  # 'histone' -> MACS2 broad peaks, 'tf' -> narrow peaks

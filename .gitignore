@@ -29,3 +29,7 @@ __pycache__/
 
 # OS files
 .DS_Store
+
+# Local scratch / temp working files
+_tmp_config.yaml
+_tmp_refs/

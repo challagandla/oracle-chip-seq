@@ -16,6 +16,11 @@ def infer_factor(sample):
     return sample.get("factor") or sample.get("mark") or sample["id"].split("_")[0]
 
 
+def peak_ext(sample):
+    # histone -> MACS2 broad peaks, tf -> narrow peaks (must match the Snakefile).
+    return "broadPeak" if sample.get("mark_type", "histone") == "histone" else "narrowPeak"
+
+
 def validate_design(cfg):
     controls = cfg.get("chip_controls", [])
     samples = cfg.get("chip_samples", [])
@@ -66,7 +71,7 @@ def build_diffbind_sheet(cfg):
                 "bamReads": f"results/bam/{sample['id']}.sorted.bam",
                 "ControlID": control_id,
                 "bamControl": f"results/bam/{control_id}.sorted.bam",
-                "Peaks": f"results/peaks/{sample['id']}_peaks.broadPeak",
+                "Peaks": f"results/peaks/{sample['id']}_peaks.{peak_ext(sample)}",
                 "PeakCaller": sample.get("peak_caller", "bed"),
             }
         )

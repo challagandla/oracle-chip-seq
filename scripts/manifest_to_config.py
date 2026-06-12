@@ -43,7 +43,7 @@ def sample_from_row(row):
     factor = row.get("factor") or row.get("mark")
     if factor:
         sample["factor"] = factor
-    for key in ["tissue", "peak_caller"]:
+    for key in ["tissue", "peak_caller", "mark_type"]:
         if row.get(key):
             sample[key] = row[key]
     return sample

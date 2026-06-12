@@ -1,4 +1,5 @@
 import os
+import re
 
 configfile: "config.yaml"
 
@@ -15,15 +16,36 @@ ALL_SAMPLES = CHIP_SAMPLES + list(CHIP_CONTROLS.keys())
 FASTQ = {s["id"]: s["fastq"] for s in config["chip_samples"] + config["chip_controls"]}
 CONTROL_MAP = {s["id"]: s["control"] for s in config["chip_samples"]}
 
+# mark_type drives peak-calling mode: histone -> broad peaks, tf -> narrow peaks.
+MARK_TYPE = {s["id"]: s.get("mark_type", "histone") for s in config["chip_samples"]}
+HISTONE_SAMPLES = [sid for sid in CHIP_SAMPLES if MARK_TYPE[sid] == "histone"]
+TF_SAMPLES = [sid for sid in CHIP_SAMPLES if MARK_TYPE[sid] != "histone"]
+
+
+def peak_ext(sample_id):
+    """MACS2 emits broadPeak with --broad and narrowPeak without it."""
+    return "broadPeak" if MARK_TYPE[sample_id] == "histone" else "narrowPeak"
+
+
+def peak_file(sample_id):
+    return f"results/peaks/{sample_id}_peaks.{peak_ext(sample_id)}"
+
 RAW_FASTQC_HTML = expand("results/fastqc/raw/{sample}_{read}_fastqc.html", sample=ALL_SAMPLES, read=["R1", "R2"])
 RAW_FASTQC_ZIP = expand("results/fastqc/raw/{sample}_{read}_fastqc.zip", sample=ALL_SAMPLES, read=["R1", "R2"])
 TRIMMED_FASTQC_HTML = expand("results/fastqc/trimmed/{sample}_R1_val_1_fastqc.html", sample=ALL_SAMPLES) + expand("results/fastqc/trimmed/{sample}_R2_val_2_fastqc.html", sample=ALL_SAMPLES)
 TRIMMED_FASTQC_ZIP = expand("results/fastqc/trimmed/{sample}_R1_val_1_fastqc.zip", sample=ALL_SAMPLES) + expand("results/fastqc/trimmed/{sample}_R2_val_2_fastqc.zip", sample=ALL_SAMPLES)
 FASTQ_SCREEN_TEXT = expand("results/contamination/fastq_screen/{sample}_{read}_screen.txt", sample=ALL_SAMPLES, read=["R1", "R2"])
 FASTQ_SCREEN_HTML = expand("results/contamination/fastq_screen/{sample}_{read}_screen.html", sample=ALL_SAMPLES, read=["R1", "R2"])
-PEAKS = expand("results/peaks/{sample}_peaks.broadPeak", sample=CHIP_SAMPLES)
+PEAKS = [peak_file(s) for s in CHIP_SAMPLES]
 BIGWIGS = expand("results/bigwig/{sample}.bw", sample=CHIP_SAMPLES)
 MULTIQC_REPORT = "results/multiqc/multiqc_report.html"
+
+
+# Pin {sample} to known IDs so e.g. align_bowtie2 ({sample}.bam) cannot also
+# match {sample}.sorted.bam and collide with sort_markdup.
+wildcard_constraints:
+    sample="|".join(re.escape(s) for s in ALL_SAMPLES),
+    ext="broadPeak|narrowPeak"
 
 
 rule all:
@@ -182,12 +204,14 @@ rule sort_markdup:
         """
 
 
-rule call_peaks:
+rule call_peaks_histone:
     input:
         bam="results/bam/{sample}.sorted.bam",
         control=lambda wc: f"results/bam/{CONTROL_MAP[wc.sample]}.sorted.bam"
     output:
         broadpeak="results/peaks/raw/{sample}_peaks.broadPeak"
+    wildcard_constraints:
+        sample="|".join(re.escape(s) for s in HISTONE_SAMPLES) if HISTONE_SAMPLES else "$^"
     params:
         gsize=REF["gsize"],
         outdir="results/peaks/raw"
@@ -202,14 +226,36 @@ rule call_peaks:
         """
 
 
+rule call_peaks_tf:
+    input:
+        bam="results/bam/{sample}.sorted.bam",
+        control=lambda wc: f"results/bam/{CONTROL_MAP[wc.sample]}.sorted.bam"
+    output:
+        narrowpeak="results/peaks/raw/{sample}_peaks.narrowPeak"
+    wildcard_constraints:
+        sample="|".join(re.escape(s) for s in TF_SAMPLES) if TF_SAMPLES else "$^"
+    params:
+        gsize=REF["gsize"],
+        outdir="results/peaks/raw"
+    log:
+        "results/logs/macs2_{sample}.log"
+    conda:
+        "envs/chipseq.yaml"
+    shell:
+        """
+        mkdir -p {params.outdir} results/logs
+        macs2 callpeak -t {input.bam} -c {input.control} --format BAMPE --name {wildcards.sample} --gsize {params.gsize} --keep-dup all -q 0.05 --outdir {params.outdir} > {log} 2>&1
+        """
+
+
 rule filter_blacklist:
     input:
-        peaks="results/peaks/raw/{sample}_peaks.broadPeak",
+        peaks="results/peaks/raw/{sample}_peaks.{ext}",
         blacklist=lambda wc: REF["black_list"]
     output:
-        "results/peaks/{sample}_peaks.broadPeak"
+        "results/peaks/{sample}_peaks.{ext}"
     log:
-        "results/logs/filter_blacklist_{sample}.log"
+        "results/logs/filter_blacklist_{sample}_{ext}.log"
     conda:
         "envs/chipseq.yaml"
     shell:
