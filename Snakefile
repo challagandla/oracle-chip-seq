@@ -42,7 +42,7 @@ rule all:
         "results/diffbind/diffbind_summary.csv",
         "results/diffbind/diffbind_plots.pdf",
         "results/diffbind/diffbind.rds",
-        "results/motifs/homer/knownResults.txt",
+        "results/motifs/motif_enrichment.tsv",
         "results/motifs/motif_summary.pdf",
         MULTIQC_REPORT
 
@@ -319,25 +319,6 @@ rule build_sample_sheets:
         """
 
 
-rule homer_motif:
-    input:
-        peaks="results/peaks/consensus_peaks.bed"
-    output:
-        "results/motifs/homer/knownResults.txt"
-    params:
-        outdir=lambda wc, output: os.path.dirname(str(output)),
-        genome=REF["name"]
-    log:
-        "results/logs/homer_motif.log"
-    conda:
-        "envs/chipseq.yaml"
-    shell:
-        """
-        mkdir -p {params.outdir} results/logs
-        findMotifsGenome.pl {input.peaks} {params.genome} {params.outdir} -size 200 -len 8,10,12 > {log} 2>&1
-        """
-
-
 rule run_diffbind:
     input:
         sheet="results/diffbind/sample_sheet.csv",
@@ -360,19 +341,23 @@ rule run_diffbind:
         """
 
 
-rule motif_summary:
+rule motif_enrichment:
     input:
-        homer="results/motifs/homer/knownResults.txt"
+        peaks="results/peaks/consensus_peaks.bed"
     output:
-        "results/motifs/motif_summary.pdf"
+        table="results/motifs/motif_enrichment.tsv",
+        summary="results/motifs/motif_summary.pdf"
+    params:
+        genome=REF["genome"],
+        outdir=lambda wc, output: os.path.dirname(str(output.table))
     log:
-        "results/logs/motif_summary.log"
+        "results/logs/motif_enrichment.log"
     conda:
         "envs/r_analysis.yaml"
     shell:
         """
-        mkdir -p results/motifs results/logs
-        Rscript analysis/motif_summary.R {input.homer} results/motifs > {log} 2>&1
+        mkdir -p {params.outdir} results/logs
+        Rscript analysis/motif_enrichment.R {input.peaks} {params.genome} {params.outdir} > {log} 2>&1
         """
 
 
@@ -388,7 +373,7 @@ rule multiqc:
         "results/peaks/consensus_peaks.bed",
         "results/diffbind/diffbind_summary.csv",
         "results/diffbind/diffbind_plots.pdf",
-        "results/motifs/homer/knownResults.txt",
+        "results/motifs/motif_enrichment.tsv",
         "results/motifs/motif_summary.pdf"
     output:
         html=MULTIQC_REPORT

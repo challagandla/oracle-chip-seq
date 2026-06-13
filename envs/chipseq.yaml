@@ -13,7 +13,6 @@ dependencies:
   - bedtools
   - macs2
   - deeptools
-  - homer
   - fastq-screen
   - multiqc
   - wget

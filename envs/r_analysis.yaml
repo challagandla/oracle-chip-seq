@@ -6,6 +6,14 @@ channels:
 dependencies:
   - r-base=4.3
   - bioconductor-diffbind
+  - bioconductor-monalisa
+  - bioconductor-jaspar2020
+  - bioconductor-tfbstools
+  - bioconductor-genomicranges
+  - bioconductor-rtracklayer
+  - bioconductor-rsamtools
+  - bioconductor-biostrings
+  - bioconductor-summarizedexperiment
   - r-ggplot2
   - r-readr
   - r-dplyr

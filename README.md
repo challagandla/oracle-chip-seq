@@ -1,6 +1,6 @@
 # Oracle Histone ChIP-seq Differential Binding Pipeline
 
-A reproducible `Snakemake` workflow for histone ChIP-seq quality control, contamination screening with `FastQ Screen`, paired-end alignment, duplicate removal, broad peak calling, blacklist filtering, `deepTools` visualization, `DiffBind` differential binding analysis, HOMER motif enrichment, and `MultiQC` reporting across human, mouse, and rat.
+A reproducible `Snakemake` workflow for histone ChIP-seq quality control, contamination screening with `FastQ Screen`, paired-end alignment, duplicate removal, broad peak calling, blacklist filtering, `deepTools` visualization, `DiffBind` differential binding analysis, open-source motif enrichment with `monaLisa` + `JASPAR`, and `MultiQC` reporting across human, mouse, and rat.
 
 ## Repository structure
 - `Snakefile` - main Snakemake workflow
@@ -10,7 +10,7 @@ A reproducible `Snakemake` workflow for histone ChIP-seq quality control, contam
 - `sample_manifest.tsv` - example manifest for config generation
 - `envs/` - Conda environment definitions for ChIP-seq processing and R analysis
 - `scripts/` - helpers for building DiffBind sample sheets, reference downloads, and manifest-driven configs
-- `analysis/` - R analysis scripts for DiffBind and motif summaries
+- `analysis/` - R analysis scripts for DiffBind and motif enrichment
 - `AUDIT.md` - end-to-end audit checklist and validation notes
 - `.gitignore` - files and folders excluded from Git tracking
 - `LICENSE` - MIT license
@@ -27,7 +27,7 @@ A reproducible `Snakemake` workflow for histone ChIP-seq quality control, contam
 9. BigWig coverage track generation with `deepTools`
 10. Heatmap/profile generation with `computeMatrix`, `plotHeatmap`, and `plotProfile`
 11. Differential binding analysis with `DiffBind`
-12. Motif enrichment analysis with `HOMER`
+12. Motif enrichment analysis with `monaLisa` against `JASPAR` vertebrate core motifs (open-source; no species-specific background required)
 13. Project-wide reporting with `MultiQC`
 
 ## Scope
@@ -82,7 +82,7 @@ If you already have Snakemake installed in a separate environment, for example:
 conda activate r_analysis
 python3 scripts/build_sample_sheets.py --config config.yaml --diffbind results/diffbind/sample_sheet.csv
 Rscript analysis/diffbind_analysis.R results/diffbind/sample_sheet.csv results/diffbind
-Rscript analysis/motif_summary.R results/motifs/homer/knownResults.txt results/motifs
+Rscript analysis/motif_enrichment.R results/peaks/consensus_peaks.bed /path/to/genome.fa results/motifs
 ```
 
 ## How to use the pipeline
@@ -131,7 +131,7 @@ snakemake --use-conda --cores 12 results/report/snakemake_report.html
 - `results/bigwig/` - normalized signal tracks
 - `results/deeptools/` - heatmap/profile plots
 - `results/diffbind/` - differential binding summary, plots, and serialized DiffBind object
-- `results/motifs/` - HOMER motif results and summaries
+- `results/motifs/` - motif enrichment table (`motif_enrichment.tsv`) and top-motif summary (`motif_summary.csv`/`.pdf`)
 - `results/multiqc/` - consolidated MultiQC report and parsed metrics
 - `results/report/` - optional Snakemake HTML report
 
@@ -148,9 +148,6 @@ snakemake --use-conda --cores 12 results/report/snakemake_report.html
 
 The pipeline's own code is **MIT** (see [LICENSE](LICENSE)). It bundles no third-party code or data;
 tools are conda-installed and invoked, so the MIT license is unaffected by the (incl. GPL) licenses of
-those tools. Full breakdown: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
-
-> ⚠️ **The HOMER motif step is academic / non-profit only** — HOMER is freeware, not open-source, and
-> not redistributable; commercial use requires the author's permission (and its genome packages are
-> UCSC-derived). For commercial use, obtain permission or skip the HOMER motif rule; alignment, peak
-> calling, coverage, QC and DiffBind do not depend on it.
+those tools. Every orchestrated tool is open-source and freely usable (including commercially) with
+citation — there are no academic-only or non-redistributable dependencies. Full breakdown:
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
