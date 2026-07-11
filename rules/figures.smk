@@ -27,6 +27,15 @@ rule figure_panels:
         r"""
         set -euo pipefail
         mkdir -p results/figures $(dirname {log})
+        # Isolate the conda R from the host R installation. ~/.Rprofile is sourced on
+        # every R startup and a .libPaths() call in it will prepend a library built
+        # against a different R version, which then fails at dyn.load with an
+        # undefined-symbol error. Clearing R_LIBS_USER alone does not help, because
+        # the profile runs after the environment is read.
+        export R_PROFILE_USER=/dev/null
+        export R_ENVIRON_USER=/dev/null
+        export R_LIBS_USER=""
+        export R_LIBS_SITE=""
         Rscript analysis/figures.R \
             --results results \
             --registry {params.registry} \

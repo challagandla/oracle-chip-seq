@@ -91,8 +91,11 @@ rule bowtie2:
     shell:
         r"""
         mkdir -p results/bam $(dirname {log})
-        bowtie2 -x {params.index} {params.reads} \
-            --very-sensitive -p {threads} 2> {log} \
+        # Default end-to-end sensitivity, as in the ENCODE ChIP-seq pipeline.
+        # --very-sensitive costs ~4x the runtime and buys nothing here: reads below
+        # MAPQ 30 are discarded in the next rule anyway, so the extra seed effort is
+        # spent on alignments that are about to be thrown away.
+        bowtie2 -x {params.index} {params.reads} -p {threads} 2> {log} \
           | samtools sort -@ {threads} -o {output.bam} -
         samtools index -@ {threads} {output.bam}
         """

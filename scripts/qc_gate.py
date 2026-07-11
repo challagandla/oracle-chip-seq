@@ -42,6 +42,26 @@ def _flagstat_mapped(path: Path) -> int:
     return 0
 
 
+def _alignment_rate(path: Path) -> float | None:
+    """Overall alignment rate from the bowtie2 summary.
+
+    Worth checking on its own rather than inferring it from the usable-read count:
+    a library can look adequately deep and still be mostly non-human. A rate far
+    below the ~90-98% typical of a clean human ChIP means the reads are dominated
+    by adapter dimer, another organism, or degraded input — and no amount of
+    downstream normalisation repairs that.
+    """
+    if not path.exists():
+        return None
+    for line in path.read_text().splitlines():
+        if "overall alignment rate" in line:
+            try:
+                return float(line.split("%")[0].strip()) / 100.0
+            except ValueError:
+                return None
+    return None
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--samples", required=True)
@@ -63,13 +83,20 @@ def main() -> None:
 
     df = samples[["sample_id", "target", "assay", "condition", "replicate", "layout"]].copy()
     for extra in (frip, cplx, frag):
-        if not extra.empty:
-            df = df.merge(extra, left_on="sample_id", right_on="sample", how="left")
-            df = df.drop(columns=[c for c in ("sample",) if c in df.columns])
+        if extra.empty:
+            continue
+        # The fragment table repeats `layout`; merging it in unrenamed would produce
+        # layout_x/layout_y and silently break every later reference to `layout`.
+        dup = [c for c in extra.columns if c in df.columns and c != "sample"]
+        extra = extra.drop(columns=dup)
+        df = df.merge(extra, left_on="sample_id", right_on="sample", how="left")
+        df = df.drop(columns=["sample"])
 
     df["usable_reads"] = [
         _flagstat_mapped(qc / "flagstat" / f"{s}.txt") for s in df.sample_id
     ]
+    logdir = qc.parent / "logs" / "bowtie2"
+    df["alignment_rate"] = [_alignment_rate(logdir / f"{s}.log") for s in df.sample_id]
 
     qcfg = cfg["qc"]
     rows = []
@@ -103,6 +130,16 @@ def main() -> None:
                 f"for {'broad' if broad else 'narrow'} marks (underpowered)"
             )
 
+        # --- alignment rate. A clean human ChIP aligns at ~90-98%. Well below that
+        # means most reads are not human: adapter dimer, contamination, or degraded
+        # material. Deduplication and normalisation cannot recover from it.
+        ar = r.get("alignment_rate")
+        if pd.notna(ar):
+            if ar < 0.50:
+                fail(f"alignment rate {ar:.0%}: most reads are not human (contamination or adapter dimer)")
+            elif ar < 0.80:
+                warn(f"alignment rate {ar:.0%} < 80%")
+
         # --- library complexity
         nrf = r.get("NRF")
         pbc1 = r.get("PBC1")
@@ -135,6 +172,7 @@ def main() -> None:
                 "layout": r.layout,
                 "peak_mode": "-" if is_input else spec["peak_mode"],
                 "usable_reads": int(r.usable_reads),
+                "alignment_rate": r.get("alignment_rate"),
                 "fragment_length": r.get("fragment_length"),
                 "NRF": r.get("NRF"),
                 "PBC1": r.get("PBC1"),
@@ -163,7 +201,7 @@ def main() -> None:
             "cutoff would be meaningless.\n\n"
         )
         cols = [
-            "sample", "target", "peak_mode", "layout", "usable_reads",
+            "sample", "target", "peak_mode", "usable_reads", "alignment_rate",
             "fragment_length", "NRF", "FRiP", "n_peaks", "status",
         ]
         fh.write("| " + " | ".join(cols) + " |\n")
@@ -176,6 +214,8 @@ def main() -> None:
                     v = f"{int(v)/1e6:.1f}M"
                 elif c in ("NRF", "FRiP") and pd.notna(v):
                     v = f"{float(v):.3f}"
+                elif c == "alignment_rate" and pd.notna(v):
+                    v = f"{float(v):.0%}"
                 elif c == "n_peaks" and pd.notna(v):
                     v = f"{int(v):,}"
                 vals.append("" if pd.isna(v) else str(v))

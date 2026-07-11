@@ -1,0 +1,10 @@
+name: idr
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # IDR's last release is pinned to python <=3.10, which conflicts with the rest
+  # of the toolchain. Isolating it is cheaper than holding the whole stack back.
+  - python=3.10
+  - idr=2.0.4.2
+  - bedtools=2.31.1

@@ -14,7 +14,6 @@ dependencies:
   - macs2=2.2.9.1
   - deeptools=3.5.5
   - subread                # featureCounts
-  - idr=2.0.4.2            # narrow-peak reproducibility
   - pygenometracks         # browser snapshots
   - multiqc
   - pandas

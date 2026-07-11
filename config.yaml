@@ -92,6 +92,6 @@ browser_loci:
   IFNG:  {chrom: chr12, start: 68150000,  end: 68165000}
 
 threads:
-  align: 16
+  align: 12
   sort: 8
   deeptools: 16

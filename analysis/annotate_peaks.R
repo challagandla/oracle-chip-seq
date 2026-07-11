@@ -26,6 +26,7 @@ opt <- parse_args(OptionParser(option_list = list(
   make_option("--down", type = "character"),
   make_option("--target", type = "character"),
   make_option("--registry", type = "character"),
+  make_option("--tss", type = "character", default = "results/annotation/tss.bed"),
   make_option("--txdb", type = "character"),
   make_option("--orgdb", type = "character"),
   make_option("--outdir", type = "character")
@@ -82,21 +83,25 @@ dev.off()
 
 # ------------------------------------------------------------ gene assignment
 
+# The TSS BED the workflow already builds carries gene symbols, so the broad-mark
+# path can use it directly instead of round-tripping TxDb transcript IDs through
+# an Entrez lookup.
+tss_gr <- NULL
+if (is_broad) {
+  if (!file.exists(opt$tss)) stop("broad mark needs the TSS bed: ", opt$tss)
+  t <- read.delim(opt$tss, header = FALSE,
+                  col.names = c("chr", "start", "end", "gene", "score", "strand"))
+  tss_gr <- GRanges(t$chr, IRanges(t$start + 1, t$end), gene = t$gene)
+  message(sprintf("  %d protein-coding TSS loaded for domain overlap", length(tss_gr)))
+}
+
 genes_for <- function(gr) {
   if (length(gr) == 0) return(character(0))
   if (is_broad) {
-    # Every gene whose TSS falls inside the domain.
-    tss <- GenomicFeatures::promoters(txdb, upstream = 0, downstream = 1)
-    hits <- findOverlaps(tss, gr)
-    ids <- unique(names(tss)[queryHits(hits)])
-    if (is.null(ids) || length(ids) == 0) {
-      ids <- unique(as.character(mcols(tss)$tx_name[queryHits(hits)]))
-    }
-    suppressMessages(
-      sym <- AnnotationDbi::select(get(orgdb), keys = unique(ids),
-                                   keytype = "ENTREZID", columns = "SYMBOL")$SYMBOL
-    )
-    return(unique(na.omit(sym)))
+    # Every gene whose TSS falls inside the domain. For a 400 kb Polycomb block the
+    # question is what it contains, not what is nearest to it.
+    hits <- findOverlaps(tss_gr, gr)
+    return(unique(na.omit(tss_gr$gene[queryHits(hits)])))
   }
   a <- as.data.frame(annotatePeak(gr, TxDb = txdb, annoDb = orgdb,
                                   tssRegion = c(-3000, 3000), verbose = FALSE))

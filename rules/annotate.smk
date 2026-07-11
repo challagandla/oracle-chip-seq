@@ -48,6 +48,7 @@ rule annotate_peaks:
         up="results/differential/{target}/up.bed",
         down="results/differential/{target}/down.bed",
         results="results/differential/{target}/results.tsv",
+        tss="results/annotation/tss.bed",
     output:
         annotation="results/annotation/{target}/peak_annotation.tsv",
         genes="results/annotation/{target}/differential_genes.tsv",
@@ -65,11 +66,20 @@ rule annotate_peaks:
         r"""
         set -euo pipefail
         mkdir -p results/annotation/{wildcards.target} $(dirname {log})
+        # Isolate the conda R from the host R installation. ~/.Rprofile is sourced on
+        # every R startup and a .libPaths() call in it will prepend a library built
+        # against a different R version, which then fails at dyn.load with an
+        # undefined-symbol error. Clearing R_LIBS_USER alone does not help, because
+        # the profile runs after the environment is read.
+        export R_PROFILE_USER=/dev/null
+        export R_ENVIRON_USER=/dev/null
+        export R_LIBS_USER=""
+        export R_LIBS_SITE=""
         Rscript analysis/annotate_peaks.R \
             --consensus {input.consensus} \
             --up {input.up} --down {input.down} \
             --target {wildcards.target} \
-            --registry {params.registry} \
+            --registry {params.registry} --tss {input.tss} \
             --txdb {params.txdb} --orgdb {params.orgdb} \
             --outdir results/annotation/{wildcards.target} > {log} 2>&1
         """

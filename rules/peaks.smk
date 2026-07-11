@@ -261,7 +261,7 @@ rule idr_narrow:
     log:
         "results/logs/idr/{target}_{condition}.log",
     conda:
-        "../envs/chipseq.yaml"
+        "../envs/idr.yaml"
     shell:
         r"""
         set -euo pipefail
@@ -364,10 +364,12 @@ rule frip:
         r"""
         set -euo pipefail
         mkdir -p results/qc/frip $(dirname {log})
+        tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
         total=$(samtools view -c {input.bam})
         if [ "$total" -eq 0 ]; then echo "empty BAM" >&2; exit 1; fi
-        inpeak=$(bedtools sort -i {input.peaks} | bedtools merge \
-                 | bedtools intersect -u -a {input.bam} -b - -ubam | samtools view -c)
+        # Merge first: overlapping peaks would otherwise count a read more than once.
+        bedtools sort -i {input.peaks} | bedtools merge > "$tmp/peaks.bed"
+        inpeak=$(bedtools intersect -u -ubam -a {input.bam} -b "$tmp/peaks.bed" | samtools view -c)
         frip=$(python3 -c "print(f'{{$inpeak/$total:.4f}}')")
         printf 'sample\ttotal_reads\treads_in_peaks\tFRiP\tn_peaks\n' > {output.tsv}
         printf '%s\t%s\t%s\t%s\t%s\n' "{wildcards.sample}" "$total" "$inpeak" "$frip" \
