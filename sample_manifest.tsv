@@ -1,9 +1,0 @@
-sample_id	type	condition	replicate	fastq_r1	fastq_r2	control	mark	tissue
-Input_control_rep1	control	control	1	data/raw/Input_control_rep1_R1.fastq.gz	data/raw/Input_control_rep1_R2.fastq.gz			example
-Input_control_rep2	control	control	2	data/raw/Input_control_rep2_R1.fastq.gz	data/raw/Input_control_rep2_R2.fastq.gz			example
-Input_treated_rep1	control	treated	1	data/raw/Input_treated_rep1_R1.fastq.gz	data/raw/Input_treated_rep1_R2.fastq.gz			example
-Input_treated_rep2	control	treated	2	data/raw/Input_treated_rep2_R1.fastq.gz	data/raw/Input_treated_rep2_R2.fastq.gz			example
-H3K27ac_control_rep1	chip	control	1	data/raw/H3K27ac_control_rep1_R1.fastq.gz	data/raw/H3K27ac_control_rep1_R2.fastq.gz	Input_control_rep1	H3K27ac	example
-H3K27ac_control_rep2	chip	control	2	data/raw/H3K27ac_control_rep2_R1.fastq.gz	data/raw/H3K27ac_control_rep2_R2.fastq.gz	Input_control_rep2	H3K27ac	example
-H3K27ac_treated_rep1	chip	treated	1	data/raw/H3K27ac_treated_rep1_R1.fastq.gz	data/raw/H3K27ac_treated_rep1_R2.fastq.gz	Input_treated_rep1	H3K27ac	example
-H3K27ac_treated_rep2	chip	treated	2	data/raw/H3K27ac_treated_rep2_R1.fastq.gz	data/raw/H3K27ac_treated_rep2_R2.fastq.gz	Input_treated_rep2	H3K27ac	example

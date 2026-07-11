@@ -1,153 +1,138 @@
-# Oracle Histone ChIP-seq Differential Binding Pipeline
+# oracle-chip-seq
 
-A reproducible `Snakemake` workflow for histone ChIP-seq quality control, contamination screening with `FastQ Screen`, paired-end alignment, duplicate removal, broad peak calling, blacklist filtering, `deepTools` visualization, `DiffBind` differential binding analysis, open-source motif enrichment with `monaLisa` + `JASPAR`, and `MultiQC` reporting across human, mouse, and rat.
+Snakemake workflow for ChIP-seq differential binding. Handles histone modifications
+and transcription factors, single-end and paired-end libraries, and selects narrow
+or broad peak calling per target rather than per run.
 
-## Repository structure
-- `Snakefile` - main Snakemake workflow
-- `config.yaml` - species references, ChIP-seq sample definitions, contamination settings, and design metadata
-- `config.sample.yaml` - example config template with a valid two-condition, two-replicate DiffBind design
-- `config/fastq_screen.conf.example` - template FastQ Screen contamination database config
-- `sample_manifest.tsv` - example manifest for config generation
-- `envs/` - Conda environment definitions for ChIP-seq processing and R analysis
-- `scripts/` - helpers for building DiffBind sample sheets, reference downloads, and manifest-driven configs
-- `analysis/` - R analysis scripts for DiffBind and motif enrichment
-- `AUDIT.md` - end-to-end audit checklist and validation notes
-- `.gitignore` - files and folders excluded from Git tracking
-- `LICENSE` - MIT license
+## The peak-mode rule
 
-## What this pipeline does
-1. Raw FASTQ QC with `FastQC`
-2. Raw FASTQ contamination screening with `FastQ Screen`
-3. Adapter trimming with `Trim Galore`
-4. Trimmed FASTQ QC with `FastQC`
-5. Paired-end ChIP-seq alignment with `Bowtie2`
-6. BAM sorting, indexing, and duplicate removal with `samtools`
-7. Broad peak calling for histone marks with `MACS2`
-8. Blacklist filtering with `bedtools`
-9. BigWig coverage track generation with `deepTools`
-10. Heatmap/profile generation with `computeMatrix`, `plotHeatmap`, and `plotProfile`
-11. Differential binding analysis with `DiffBind`
-12. Motif enrichment analysis with `monaLisa` against `JASPAR` vertebrate core motifs (open-source; no species-specific background required)
-13. Project-wide reporting with `MultiQC`
+Whether a target is punctate or domain-forming changes far more than one flag on
+the peak caller, so the classification lives in one file,
+`config/mark_registry.yaml`, and every downstream step reads it from there.
 
-## Scope
-This repository is intentionally ChIP-seq only. It does not run RNA-seq quantification, differential expression, or transcriptomics integration. The statistical comparison step is differential binding analysis from ChIP-seq peaks and aligned reads.
+| | narrow | broad |
+|---|---|---|
+| examples | H3K4me3, H3K27ac, H3K9ac, H3K4me2, H2A.Z, CTCF and other TFs | H3K4me1, H3K27me3, H3K9me3, H3K36me3, H3K79me2, H4K20me1 |
+| peak caller | `macs2` default | `macs2 --broad --broad-cutoff` |
+| reproducibility | IDR across replicates | naive overlap against pooled-replicate peaks |
+| width filter | drop peaks above a few kb (artefacts) | allow domains up to 1 Mb |
+| profile geometry | reference-point on the summit, or on the TSS for promoter marks | scale-regions across the domain body |
+| counting window | fixed window on the MACS2 summit | the full called interval |
+| size factors | median-of-ratios on peak counts | genome-wide background bins |
+| motif enrichment | yes | no |
+| FRiP and depth floors | per mark | per mark |
 
-## Quick start
-### 1. Fill in `config.yaml`
-- Set `species` to `human`, `mouse`, or `rat`.
-- Provide absolute paths for:
-  - `genome`
-  - `chrom_sizes`
-  - `black_list`
-  - `bt2_index`
-- Configure `contamination.fastq_screen_conf` to point to a FastQ Screen config file with Bowtie2 index prefixes for the genomes or contaminants you want to screen.
-- Update ChIP sample names, FASTQ paths, input controls, conditions, replicates, histone mark/factor, and tissue labels.
-- Include at least two biological replicates per condition for reliable differential binding analysis.
+Classification follows the [ENCODE histone ChIP-seq spec](https://www.encodeproject.org/chip-seq/histone/).
+Two points it gets right that are commonly got wrong:
 
-### 2. Configure contamination screening
-Copy and edit the FastQ Screen template:
+- **Acetylation and H3K4me3 are narrow.** Calling H3K27ac with `--broad` fuses
+  neighbouring enhancers into multi-kb blocks and destroys the summits that motif
+  analysis and summit-centred counting depend on.
+- **H3K4me1 is broad**, despite marking enhancers. Its signal is a wide, low
+  shoulder around the nucleosome-depleted region, not a sharp peak.
+
+Unlisted targets fall back to narrow, with a warning. Narrow is the safer default:
+a punctate caller on a broad mark loses breadth, whereas a broad caller on a
+punctate mark silently merges distinct regulatory elements.
+
+Why each downstream step branches:
+
+- **IDR only for narrow.** IDR models rank consistency within a ranked peak list.
+  Broad peaks are wide with compressed scores and the model does not hold; ENCODE
+  uses overlap for broad marks for exactly this reason.
+- **Background-bin size factors for broad.** Median-of-ratios assumes most peaks
+  are unchanged. A repressive domain mark can move globally — the textbook case is
+  EZH2 inhibition — and when it does, normalising on reads-in-peaks absorbs the
+  biology into the size factors and reports nothing. Estimating depth from
+  background bins keeps the global component in the result. Where a truly global
+  shift is expected an exogenous spike-in is the only unbiased normaliser;
+  background bins are a proxy.
+- **No motifs for broad.** Scanning a 50 kb Polycomb domain for 8-mers recovers its
+  base composition, and the software will report that with confident p-values.
+- **Per-mark QC thresholds.** A FRiP of 2% is a failure for H3K4me3 and entirely
+  normal for H3K9me3. One global cutoff cannot serve both.
+
+Inspect the resolved settings for any target:
+
 ```bash
-cp config/fastq_screen.conf.example config/fastq_screen.conf
-```
-Replace each `/path/to/...` database entry with a real Bowtie2 index prefix, then set this in `config.yaml`:
-```yaml
-contamination:
-  fastq_screen_conf: "config/fastq_screen.conf"
-  subset: 100000
+python3 scripts/marks.py             # the whole table
+python3 scripts/marks.py H3K27me3    # one target, fully resolved
 ```
 
-### 3. Place raw data
-Put FASTQ pairs in `data/raw/` or update paths in `config.yaml`.
+## Steps
 
-### 4. Create Conda environments
+FASTQ (SRA or local) → FastQC → Trim Galore → bowtie2 → filter (MAPQ ≥ 30, primary
+chromosomes, proper pairs, deduplicate) → fragment-length estimate → MACS2 (mode
+from the registry) → blacklist and width filter → IDR or naive overlap →
+per-target consensus → featureCounts → DESeq2 → ChIPseeker and GO →
+monaLisa/JASPAR motifs → figures, browser tracks, MultiQC, QC gate.
+
+Also computed: FRiP, NRF/PBC1/PBC2 library complexity, deepTools fingerprint,
+log2(ChIP/Input) bigwigs, Spearman correlation and PCA on binned signal.
+
+## Running it
+
 ```bash
-conda env create -f envs/chipseq.yaml
-conda env create -f envs/r_analysis.yaml
+snakemake --use-conda --cores 32
 ```
 
-### 5. Run the full workflow
-```bash
-conda activate chipseq
-snakemake --use-conda --cores 12
+Reference paths and the contrast are set in `config.yaml`; the cohort is
+`samples.tsv`:
+
+```
+sample_id  srr  target  assay  condition  replicate  control_id  layout  cell_line
 ```
 
-If you already have Snakemake installed in a separate environment, for example:
-```bash
-/home/epigenetics/miniforge3/envs/snakemake/bin/snakemake --use-conda --cores 12
+`assay` is `chip` or `input`. `layout` is `single` or `paired` **per sample** —
+libraries of both kinds can coexist in one run, and both are counted as fragments.
+Leave `srr` blank and drop FASTQs into `data/raw/` to skip the download.
+
+The design is validated before anything runs: missing controls, fewer than two
+replicates in a condition, and unknown layouts all fail at parse time rather than
+three hours into an alignment.
+
+## Demo dataset
+
+`samples.tsv` points at [GSE277460](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE277460)
+(PRJNA1162470): Jurkat T cells, resting vs anti-CD3/CD28 stimulated, profiled for
+H3K27ac, H3K4me3, H3K27me3 and CTCF with matched inputs — four targets spanning
+punctate histone, broad histone and transcription factor, two conditions, two
+biological replicates each.
+
+Two things about it are worth knowing, because both are common and both are traps:
+
+- **SRA declares every replicate-1 run SINGLE. They are 2×150 paired** (92.7%
+  concordant alignment). `samples.tsv` records the true layout, and
+  `scripts/fetch_sra.py` fails loudly when the data disagree with the declaration
+  rather than silently discarding R2.
+- **The stimulated H3K27ac and H3K4me3 libraries are ~2.2M reads against ~10M for
+  resting.** The QC gate flags this and the summary reports the per-target depth
+  ratio. Normalisation rescales counts but cannot recover information that was
+  never sequenced, so those two contrasts are underpowered in one arm — which
+  looks exactly like biology and is not.
+
+## Outputs
+
+```
+results/
+  qc/            qc_gate.tsv (per-mark PASS/WARN/FAIL), multiqc, fingerprint, correlation, PCA
+  bam/           filtered alignments
+  bigwig/        *.cpm.bw and *.log2ratio.bw (ChIP/Input)
+  peaks/         per-sample; reproducible/ (IDR or overlap); consensus/ per target
+  profiles/      heatmaps and meta-profiles, geometry per peak mode
+  differential/  DESeq2 results, up/down BEDs, size factors
+  annotation/    ChIPseeker annotation, differential genes, GO
+  motifs/        JASPAR enrichment in up/down peaks
+  figures/       publication figures and genome-browser panels
+  summary/       analysis_summary.md
 ```
 
-### 6. Run only R analysis steps
-```bash
-conda activate r_analysis
-python3 scripts/build_sample_sheets.py --config config.yaml --diffbind results/diffbind/sample_sheet.csv
-Rscript analysis/diffbind_analysis.R results/diffbind/sample_sheet.csv results/diffbind
-Rscript analysis/motif_enrichment.R results/peaks/consensus_peaks.bed /path/to/genome.fa results/motifs
-```
+Nothing under `results/` or `data/` is tracked by git.
 
-## How to use the pipeline
-- `snakemake --use-conda --cores 12` builds all core outputs in `results/`.
-- `snakemake results/contamination/fastq_screen/H3K27ac_control_rep1_R1_screen.txt` runs one FastQ Screen contamination check.
-- `snakemake results/diffbind/sample_sheet.csv` generates the DiffBind sample sheet.
-- `snakemake results/peaks/consensus_peaks.bed` creates a merged peak set for deepTools.
-- `snakemake results/diffbind/diffbind_summary.csv` runs differential binding analysis.
-- `snakemake results/multiqc/multiqc_report.html` generates the MultiQC report.
-- `snakemake results/report/snakemake_report.html` generates a Snakemake HTML report of workflow execution.
+## Licence
 
-## Sample manifest and config generation
-1. Edit `sample_manifest.tsv` with your sample names and file paths.
-2. Generate `config.yaml` from the manifest:
-```bash
-python3 scripts/manifest_to_config.py sample_manifest.tsv \
-  --species human \
-  --genome /path/to/hg38.fa \
-  --chrom-sizes /path/to/hg38.chrom.sizes \
-  --bt2-index /path/to/hg38 \
-  --black-list /path/to/hg38-blacklist.v2.bed \
-  --output config.yaml
-```
-
-## Reference download helper
-Use the species-specific helper to download a genome FASTA, build a Bowtie2 index, and generate chromosome sizes:
-```bash
-python3 scripts/download_references.py human --outdir references
-```
-
-Build separate Bowtie2 indexes for any extra contamination-screening databases you add to `config/fastq_screen.conf`, such as PhiX, E. coli, yeast, or alternative host genomes.
-
-## Generate reports
-```bash
-snakemake --use-conda --cores 12 results/multiqc/multiqc_report.html
-snakemake --use-conda --cores 12 results/report/snakemake_report.html
-```
-
-## Expected outputs
-- `results/fastqc/` - raw and trimmed FASTQ QC reports
-- `results/contamination/fastq_screen/` - raw FASTQ contamination-screen reports
-- `results/trimmed/` - trimmed FASTQ files
-- `results/bam/` - aligned and sorted BAM files plus indices
-- `results/peaks/raw/` - raw MACS2 broadPeak files
-- `results/peaks/` - blacklist-filtered broadPeak files and consensus peaks
-- `results/bigwig/` - normalized signal tracks
-- `results/deeptools/` - heatmap/profile plots
-- `results/diffbind/` - differential binding summary, plots, and serialized DiffBind object
-- `results/motifs/` - motif enrichment table (`motif_enrichment.tsv`) and top-motif summary (`motif_summary.csv`/`.pdf`)
-- `results/multiqc/` - consolidated MultiQC report and parsed metrics
-- `results/report/` - optional Snakemake HTML report
-
-## Notes and best practices
-- Use FASTQ and reference files that match the selected species assembly.
-- Confirm `bt2_index` points to a built Bowtie2 index set.
-- Confirm `black_list` points to the matching genome blacklist file.
-- Confirm FastQ Screen database entries point to valid Bowtie2 index prefixes.
-- Check the DiffBind sample sheet before running contrasts; each condition should have biological replicates.
-- For genome-specific peak metrics, adjust `MACS2` parameters in `Snakefile`.
-- If you use `mamba`, replace `conda env create` with `mamba env create`.
-
-## License & usage
-
-The pipeline's own code is **MIT** (see [LICENSE](LICENSE)). It bundles no third-party code or data;
-tools are conda-installed and invoked, so the MIT license is unaffected by the (incl. GPL) licenses of
-those tools. Every orchestrated tool is open-source and freely usable (including commercially) with
-citation — there are no academic-only or non-redistributable dependencies. Full breakdown:
-[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Pipeline code is MIT (`LICENSE`). No third-party code or reference data is bundled;
+tools are conda-installed and invoked as separate processes. Every tool used is
+open-source and free for commercial use with citation. HOMER is deliberately **not**
+used — it is academic-use-only and not redistributable — so motif enrichment uses
+monaLisa + JASPAR. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

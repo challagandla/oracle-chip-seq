@@ -2,19 +2,25 @@ name: chipseq
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.11
-  - snakemake
-  - fastqc
-  - trim-galore
-  - bowtie2
-  - samtools
-  - bedtools
-  - macs2
-  - deeptools
-  - fastq-screen
+  - sra-tools=3.1.1
+  - fastqc=0.12.1
+  - trim-galore=0.6.10
+  - cutadapt
+  - bowtie2=2.5.4
+  - samtools=1.21
+  - bedtools=2.31.1
+  - macs2=2.2.9.1
+  - deeptools=3.5.5
+  - subread                # featureCounts
+  - idr=2.0.4.2            # narrow-peak reproducibility
+  - pygenometracks         # browser snapshots
   - multiqc
-  - wget
   - pandas
   - pyyaml
+  - pigz
+  - numpy<2                # macs2 2.2.x is not built against the numpy 2 ABI
+# NOTE: HOMER is deliberately absent. It is academic-use-only and not
+# redistributable; motif enrichment uses monaLisa + JASPAR in envs/r_analysis.yaml.
+# See THIRD_PARTY_LICENSES.md.

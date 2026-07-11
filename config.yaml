@@ -1,84 +1,97 @@
+# ChIP-seq differential binding workflow
+#
+# Demo dataset: GSE277460 / PRJNA1162470 — Jurkat T cells, resting vs
+# anti-CD3/CD28 stimulated. Four targets spanning every peak class:
+#   H3K27ac  punctate histone     (narrow)
+#   H3K4me3  punctate histone     (narrow)
+#   H3K27me3 domain histone       (broad)
+#   CTCF     transcription factor (narrow)
+# Replicate 1 is single-end and replicate 2 is paired-end, which is why the
+# workflow resolves library layout per sample rather than globally.
+
+samples: samples.tsv
+mark_registry: config/mark_registry.yaml
+
 species: human
+
+# Contrast to test. Reference level first.
+contrast:
+  variable: condition
+  reference: resting
+  treatment: stimulated
 
 references:
   human:
-    genome: "/path/to/hg38.fa"
-    chrom_sizes: "/path/to/hg38.chrom.sizes"
-    black_list: "/path/to/hg38-blacklist.v2.bed"
-    bt2_index: "/path/to/hg38"
-    name: "hg38"
+    name: hg38
+    genome: /media/epigenetics/array_raid/resources/genomes/hg38/hg38.fa
+    chrom_sizes: /media/epigenetics/array_raid/resources/genomes/hg38/hg38.chrom.sizes
+    blacklist: /media/epigenetics/array_raid/resources/genomes/hg38/hg38-blacklist.v2.bed.gz
+    bt2_index: /media/epigenetics/array_raid/resources/genomes/hg38/bowtie2/GRCh38_noalt_as
+    gtf: /media/epigenetics/array_raid/resources/genomes/hg38/annotation/gencode.v45.annotation.gtf.gz
+    # MACS2 --gsize (mappable genome).
     gsize: "2.7e9"
-  mouse:
-    genome: "/path/to/mm39.fa"
-    chrom_sizes: "/path/to/mm39.chrom.sizes"
-    black_list: "/path/to/mm39-blacklist.v2.bed"
-    bt2_index: "/path/to/mm39"
-    name: "mm39"
-    gsize: "1.87e9"
-  rat:
-    genome: "/path/to/rn6.fa"
-    chrom_sizes: "/path/to/rn6.chrom.sizes"
-    black_list: "/path/to/rn6-blacklist.bed"
-    bt2_index: "/path/to/rn6"
-    name: "rn6"
-    gsize: "2.53e9"
+    # deepTools --effectiveGenomeSize for GRCh38. This value is read-length
+    # dependent; 2701495761 is the 50 bp figure and matches these libraries.
+    effective_genome_size: 2701495761
+    txdb: TxDb.Hsapiens.UCSC.hg38.knownGene
+    orgdb: org.Hs.eg.db
+    homer_genome: hg38
 
-contamination:
-  fastq_screen_conf: "config/fastq_screen.conf.example"
-  subset: 100000
+alignment:
+  # Reads below this MAPQ are multi-mapping. Keeping them creates false peaks in
+  # repeats and segmental duplications, which is where blacklists come from.
+  min_mapq: 30
+  # Mitochondrial and non-primary contigs carry no ChIP signal but do carry
+  # artefacts; dropping them also stabilises library-size normalisation.
+  keep_chroms_regex: "^chr([0-9]+|X|Y)$"
+  remove_duplicates: true
 
-chip_controls:
-  - id: Input_control_rep1
-    fastq:
-      - data/raw/Input_control_rep1_R1.fastq.gz
-      - data/raw/Input_control_rep1_R2.fastq.gz
-  - id: Input_control_rep2
-    fastq:
-      - data/raw/Input_control_rep2_R1.fastq.gz
-      - data/raw/Input_control_rep2_R2.fastq.gz
-  - id: Input_treated_rep1
-    fastq:
-      - data/raw/Input_treated_rep1_R1.fastq.gz
-      - data/raw/Input_treated_rep1_R2.fastq.gz
-  - id: Input_treated_rep2
-    fastq:
-      - data/raw/Input_treated_rep2_R1.fastq.gz
-      - data/raw/Input_treated_rep2_R2.fastq.gz
+peaks:
+  # A peak is kept only if it reproduces across replicates. Narrow targets use
+  # IDR; broad targets use naive overlap (see config/mark_registry.yaml).
+  idr_threshold: 0.05
+  # Reciprocal overlap required for a peak to count as reproduced.
+  overlap_fraction: 0.5
 
-chip_samples:
-  - id: H3K27ac_control_rep1
-    fastq:
-      - data/raw/H3K27ac_control_rep1_R1.fastq.gz
-      - data/raw/H3K27ac_control_rep1_R2.fastq.gz
-    control: Input_control_rep1
-    condition: control
-    replicate: 1
-    factor: H3K27ac
-    tissue: example
-  - id: H3K27ac_control_rep2
-    fastq:
-      - data/raw/H3K27ac_control_rep2_R1.fastq.gz
-      - data/raw/H3K27ac_control_rep2_R2.fastq.gz
-    control: Input_control_rep2
-    condition: control
-    replicate: 2
-    factor: H3K27ac
-    tissue: example
-  - id: H3K27ac_treated_rep1
-    fastq:
-      - data/raw/H3K27ac_treated_rep1_R1.fastq.gz
-      - data/raw/H3K27ac_treated_rep1_R2.fastq.gz
-    control: Input_treated_rep1
-    condition: treated
-    replicate: 1
-    factor: H3K27ac
-    tissue: example
-  - id: H3K27ac_treated_rep2
-    fastq:
-      - data/raw/H3K27ac_treated_rep2_R1.fastq.gz
-      - data/raw/H3K27ac_treated_rep2_R2.fastq.gz
-    control: Input_treated_rep2
-    condition: treated
-    replicate: 2
-    factor: H3K27ac
-    tissue: example
+signal:
+  bin_size: 25
+  smooth_length: 75
+  # Bigwigs are produced two ways: CPM (per-sample signal) and log2 ChIP/Input
+  # (enrichment). Only the latter is comparable across samples whose antibodies
+  # have different efficiencies.
+  extend_reads_se: 200
+
+differential:
+  fdr: 0.05
+  # FDR alone is not a sufficient call: at high depth ChIP-seq will flag
+  # biologically trivial 1.1x shifts, so require an effect size too.
+  min_lfc: 1.0
+  # Replicates a peak must appear in to enter the consensus count matrix.
+  min_overlap: 2
+
+qc:
+  fastq_screen_conf: config/fastq_screen.conf.example
+  fastq_screen_subset: 100000
+  # ENCODE depth standards. Libraries below these are usable but underpowered,
+  # and the QC gate says so rather than failing silently.
+  min_usable_reads_narrow: 20000000
+  min_usable_reads_broad: 45000000
+  # Non-redundant fraction / PCR bottleneck coefficients (ENCODE).
+  min_nrf: 0.8
+  min_pbc1: 0.7
+  min_pbc2: 3.0
+
+# Loci rendered as genome-browser tracks. These are the canonical immediate-early
+# and activation genes for T-cell receptor stimulation; if the experiment worked,
+# H3K27ac must increase over them.
+browser_loci:
+  IL2:   {chrom: chr4,  start: 122448000, end: 122462000}
+  CD69:  {chrom: chr12, start: 9750000,   end: 9780000}
+  EGR2:  {chrom: chr10, start: 62805000,  end: 62825000}
+  NR4A1: {chrom: chr12, start: 52010000,  end: 52070000}
+  IFNG:  {chrom: chr12, start: 68150000,  end: 68165000}
+
+threads:
+  align: 16
+  sort: 8
+  deeptools: 16

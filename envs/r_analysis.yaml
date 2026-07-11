@@ -2,18 +2,34 @@ name: r_analysis
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - r-base=4.3
-  - bioconductor-diffbind
+  # differential binding
+  - bioconductor-deseq2
+  - bioconductor-apeglm          # log2FC shrinkage
+  - r-ashr                       # shrinkage fallback (CRAN, not Bioconductor)
+  # annotation / enrichment
+  - bioconductor-chipseeker
+  - bioconductor-txdb.hsapiens.ucsc.hg38.knowngene
+  - bioconductor-org.hs.eg.db
+  - bioconductor-clusterprofiler
+  - bioconductor-genomicranges
+  - bioconductor-genomicfeatures
+  - bioconductor-rtracklayer
+  # motif enrichment — permissively licensed; deliberately not HOMER
   - bioconductor-monalisa
   - bioconductor-jaspar2020
   - bioconductor-tfbstools
-  - bioconductor-genomicranges
-  - bioconductor-rtracklayer
   - bioconductor-rsamtools
   - bioconductor-biostrings
   - bioconductor-summarizedexperiment
+  # figures
   - r-ggplot2
-  - r-readr
+  - r-ggrepel
+  - r-patchwork
+  - r-scales
   - r-dplyr
+  - r-tidyr
+  - r-readr
+  - r-optparse
+  - r-yaml

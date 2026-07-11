@@ -15,18 +15,27 @@ with citation. There are **no academic-only, non-commercial, or non-redistributa
 
 | Tool | License | Role |
 |---|---|---|
+| SRA Toolkit | public domain (US Gov) | FASTQ retrieval |
 | Bowtie2 | GPL-3.0 | alignment |
 | samtools / bedtools | MIT / GPL-2 | bam/interval ops |
 | MACS2 | BSD-3-Clause | peak calling |
+| IDR | GPL-2.0 | narrow-peak reproducibility |
+| Subread (featureCounts) | GPL-3.0 | read counting in peaks |
 | deepTools | GPL-3.0 | coverage/QC |
+| pyGenomeTracks | GPL-3.0 | browser snapshots |
 | FastQC | GPL-3.0 | QC |
-| FastQ Screen | GPL-3.0 | contamination QC |
 | Trim Galore | GPL-3.0 | trimming |
 | MultiQC | GPL-3.0 | report aggregation |
 
-**R/Bioconductor:** DiffBind (Artistic-2.0), monaLisa (GPL-3.0), TFBSTools (GPL-2), JASPAR2020 motif
-data (CC0 / public domain), GenomicRanges/rtracklayer/Rsamtools/Biostrings/SummarizedExperiment
-(Artistic-2.0), ggplot2 (MIT), dplyr/readr (MIT). Invoked within R; not redistributed.
+**R/Bioconductor:** DESeq2 (LGPL-3), apeglm (GPL-2), ashr (GPL-3), ChIPseeker (Artistic-2.0),
+clusterProfiler (Artistic-2.0), TxDb.Hsapiens.UCSC.hg38.knownGene / org.Hs.eg.db (Artistic-2.0),
+monaLisa (GPL-3.0), TFBSTools (GPL-2), JASPAR2020 motif data (CC0 / public domain),
+GenomicRanges/GenomicFeatures/rtracklayer/Rsamtools/Biostrings/SummarizedExperiment (Artistic-2.0),
+ggplot2/dplyr/readr/tidyr/scales/patchwork/ggrepel (MIT/GPL-2). Invoked within R; not redistributed.
+
+**HOMER is deliberately not used.** It is free for academic use only and is not redistributable,
+which would reintroduce the exact restriction this project removed. Motif enrichment uses
+monaLisa + JASPAR instead.
 
 **On the GPL tools:** called as independent executables (Snakemake rules) — mere aggregation, not
 linking — so they impose no copyleft obligation on this MIT pipeline.

@@ -1,0 +1,21 @@
+sample_id	srr	target	assay	condition	replicate	control_id	layout	cell_line
+Input_resting_rep1	SRR35556586	Input	input	resting	1		paired	Jurkat
+Input_resting_rep2	SRR35551257	Input	input	resting	2		paired	Jurkat
+Input_stimulated_rep1	SRR35556593	Input	input	stimulated	1		paired	Jurkat
+Input_stimulated_rep2	SRR35551250	Input	input	stimulated	2		paired	Jurkat
+H3K27ac_resting_rep1	SRR35556587	H3K27ac	chip	resting	1	Input_resting_rep1	paired	Jurkat
+H3K27ac_resting_rep2	SRR35551256	H3K27ac	chip	resting	2	Input_resting_rep2	paired	Jurkat
+H3K27ac_stimulated_rep1	SRR35556594	H3K27ac	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
+H3K27ac_stimulated_rep2	SRR35551249	H3K27ac	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat
+H3K4me3_resting_rep1	SRR35556589	H3K4me3	chip	resting	1	Input_resting_rep1	paired	Jurkat
+H3K4me3_resting_rep2	SRR35551254	H3K4me3	chip	resting	2	Input_resting_rep2	paired	Jurkat
+H3K4me3_stimulated_rep1	SRR35556596	H3K4me3	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
+H3K4me3_stimulated_rep2	SRR35551247	H3K4me3	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat
+H3K27me3_resting_rep1	SRR35556590	H3K27me3	chip	resting	1	Input_resting_rep1	paired	Jurkat
+H3K27me3_resting_rep2	SRR35551253	H3K27me3	chip	resting	2	Input_resting_rep2	paired	Jurkat
+H3K27me3_stimulated_rep1	SRR35556597	H3K27me3	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
+H3K27me3_stimulated_rep2	SRR35551246	H3K27me3	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat
+CTCF_resting_rep1	SRR35556592	CTCF	chip	resting	1	Input_resting_rep1	paired	Jurkat
+CTCF_resting_rep2	SRR35551251	CTCF	chip	resting	2	Input_resting_rep2	paired	Jurkat
+CTCF_stimulated_rep1	SRR35556599	CTCF	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
+CTCF_stimulated_rep2	SRR35551244	CTCF	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat

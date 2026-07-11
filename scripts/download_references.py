@@ -1,86 +1,102 @@
 #!/usr/bin/env python3
+"""Fetch the reference files config.yaml expects.
+
+Downloads the genome FASTA, chrom sizes, ENCODE blacklist, GENCODE annotation and
+a prebuilt Bowtie2 index. The index is pulled prebuilt rather than built locally:
+bowtie2-build on a mammalian genome takes hours, and the published no-alt analysis
+set is the one ENCODE aligns against, so rolling our own would be both slower and
+less standard.
+
+    python3 scripts/download_references.py --species human --outdir references/hg38
+"""
+from __future__ import annotations
+
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
-SPECIES_CONFIG = {
+SPECIES = {
     "human": {
-        "alias": "hg38",
-        "fasta_url": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_50/GRCh38.primary_assembly.genome.fa.gz",
+        "name": "hg38",
+        "genome": "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz",
+        "chrom_sizes": "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes",
+        "blacklist": "https://github.com/Boyle-Lab/Blacklist/raw/master/lists/hg38-blacklist.v2.bed.gz",
+        "gtf": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_45/gencode.v45.annotation.gtf.gz",
+        "bt2_index": "https://genome-idx.s3.amazonaws.com/bt/GRCh38_noalt_as.zip",
+        "bt2_prefix": "GRCh38_noalt_as",
     },
     "mouse": {
-        "alias": "mm39",
-        "fasta_url": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M30/GRCm39.primary_assembly.genome.fa.gz",
-    },
-    "rat": {
-        "alias": "rn6",
-        "fasta_url": "https://ftp.ensembl.org/pub/release-113/fasta/rattus_norvegicus/dna/Rattus_norvegicus.Rnor_6.0.dna.primary_assembly.fa.gz",
+        "name": "mm39",
+        "genome": "https://hgdownload.soe.ucsc.edu/goldenPath/mm39/bigZips/mm39.fa.gz",
+        "chrom_sizes": "https://hgdownload.soe.ucsc.edu/goldenPath/mm39/bigZips/mm39.chrom.sizes",
+        "blacklist": "https://github.com/Boyle-Lab/Blacklist/raw/master/lists/mm10-blacklist.v2.bed.gz",
+        "gtf": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M34/gencode.vM34.annotation.gtf.gz",
+        "bt2_index": "https://genome-idx.s3.amazonaws.com/bt/mm39.zip",
+        "bt2_prefix": "mm39",
     },
 }
 
 
-def run(cmd):
-    print("Running:", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+def fetch(url: str, dest: Path) -> None:
+    if dest.exists() and dest.stat().st_size > 0:
+        print(f"[skip] {dest.name}")
+        return
+    print(f"[get ] {dest.name}")
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    subprocess.run(["curl", "-fsSL", "-o", str(tmp), url], check=True)
+    tmp.rename(dest)
 
 
-def download(url, dest):
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        print(f"Skipping existing file: {dest}")
-        return dest
-    run(["wget", "-c", url, "-O", str(dest)])
-    return dest
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--species", choices=sorted(SPECIES), required=True)
+    p.add_argument("--outdir", required=True)
+    p.add_argument("--skip-index", action="store_true",
+                   help="Skip the Bowtie2 index (~4 GB) if one is already available")
+    args = p.parse_args()
 
+    spec = SPECIES[args.species]
+    out = Path(args.outdir)
+    out.mkdir(parents=True, exist_ok=True)
+    name = spec["name"]
 
-def decompress(src):
-    if src.suffix == ".gz":
-        out = src.with_suffix("")
-        if out.exists():
-            print(f"Skipping existing decompressed file: {out}")
-            return out
-        run(["gunzip", "-kf", str(src)])
-        return out
-    return src
+    genome_gz = out / f"{name}.fa.gz"
+    genome = out / f"{name}.fa"
+    fetch(spec["genome"], genome_gz)
+    if not genome.exists():
+        print(f"[gunzip] {genome.name}")
+        with open(genome, "wb") as fh:
+            subprocess.run(["gunzip", "-c", str(genome_gz)], stdout=fh, check=True)
+    # The motif step reads sequence straight from the FASTA and needs the index.
+    if not (out / f"{name}.fa.fai").exists():
+        subprocess.run(["samtools", "faidx", str(genome)], check=True)
 
+    fetch(spec["chrom_sizes"], out / f"{name}.chrom.sizes")
+    fetch(spec["blacklist"], out / f"{name}-blacklist.v2.bed.gz")
+    fetch(spec["gtf"], out / "annotation.gtf.gz")
 
-def build_bowtie2_index(fasta, prefix):
-    print(f"Building Bowtie2 index: {prefix}")
-    run(["bowtie2-build", str(fasta), str(prefix)])
+    if not args.skip_index:
+        idx_dir = out / "bowtie2"
+        idx_dir.mkdir(exist_ok=True)
+        prefix = idx_dir / spec["bt2_prefix"]
+        if not Path(f"{prefix}.1.bt2").exists():
+            zipf = idx_dir / "index.zip"
+            fetch(spec["bt2_index"], zipf)
+            subprocess.run(["unzip", "-o", "-j", str(zipf), "-d", str(idx_dir)], check=True)
+            zipf.unlink()
 
-
-def make_chrom_sizes(fasta, out_path):
-    print(f"Generating chromosome sizes: {out_path}")
-    run(["samtools", "faidx", str(fasta)])
-    with open(out_path, "w") as out:
-        with open(str(fasta) + ".fai") as fai:
-            for line in fai:
-                parts = line.strip().split("\t")
-                out.write(f"{parts[0]}\t{parts[1]}\n")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Download genome FASTA files and build ChIP-seq alignment references.")
-    parser.add_argument("species", choices=SPECIES_CONFIG.keys(), help="Species name")
-    parser.add_argument("--outdir", default="references", help="Directory to store downloaded references")
-    args = parser.parse_args()
-
-    cfg = SPECIES_CONFIG[args.species]
-    outdir = Path(args.outdir) / args.species
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    fasta_gz = download(cfg["fasta_url"], outdir / f"{cfg['alias']}.fa.gz")
-    fasta = decompress(fasta_gz)
-
-    build_bowtie2_index(fasta, outdir / cfg["alias"])
-    chrom_sizes = outdir / f"{cfg['alias']}.chrom.sizes"
-    make_chrom_sizes(fasta, chrom_sizes)
-
-    print("Reference download and preparation complete.")
-    print(f"Genome: {fasta}")
-    print(f"Bowtie2 index prefix: {outdir / cfg['alias']}")
-    print(f"Chrom sizes: {chrom_sizes}")
+    print(f"\nDone. Point config.yaml at these:")
+    print(f"  genome:      {genome.resolve()}")
+    print(f"  chrom_sizes: {(out / f'{name}.chrom.sizes').resolve()}")
+    print(f"  blacklist:   {(out / f'{name}-blacklist.v2.bed.gz').resolve()}")
+    print(f"  gtf:         {(out / 'annotation.gtf.gz').resolve()}")
+    if not args.skip_index:
+        print(f"  bt2_index:   {(out / 'bowtie2' / spec['bt2_prefix']).resolve()}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+        sys.exit(f"command failed: {e}")
