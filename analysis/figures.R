@@ -173,7 +173,11 @@ save_pub(fig2, file.path(opt$outdir, "fig2_peak_landscape.pdf"), width_mm = 140,
 
 cor_path <- file.path(R, "qc", "correlation", "spearman_matrix.tsv")
 if (file.exists(cor_path)) {
-  cm <- read.delim(cor_path, row.names = 1, check.names = FALSE)
+  # plotCorrelation writes "#plotCorrelation --outFileCorMatrix" above the header.
+  # read.delim defaults to comment.char = "", so that line is taken as the header
+  # (one column) and every data row then has "more columns than column names".
+  cm <- read.delim(cor_path, row.names = 1, check.names = FALSE,
+                   comment.char = "#")
   colnames(cm) <- rownames(cm)
   long <- as.data.frame(as.table(as.matrix(cm)))
   names(long) <- c("a", "b", "rho")
@@ -234,13 +238,23 @@ for (t in target_levels) {
   d <- read_tsv(f, show_col_types = FALSE)
   d$target <- t
   d$peak_mode <- modes[t]
-  volc[[t]] <- d
+
+  # A failed target's table is empty, and readr then guesses its column types
+  # from nothing (logical). bind_rows refuses to combine a logical column with
+  # the numeric one from a target that worked, so the whole figure dies because
+  # one antibody did not. Pin the types we actually use.
+  num <- c("log2FoldChange", "log2FoldChange_MLE", "padj", "baseMean")
+  for (cc in intersect(num, names(d))) d[[cc]] <- as.numeric(d[[cc]])
+  if ("direction" %in% names(d)) d$direction <- as.character(d$direction)
+
   stats[[t]] <- tibble(
     target = t, peak_mode = modes[t],
     tested = nrow(d),
     up = sum(d$direction == "up", na.rm = TRUE),
     down = sum(d$direction == "down", na.rm = TRUE)
   )
+  # Only targets with something to plot go into the volcano.
+  if (nrow(d)) volc[[t]] <- d
 }
 
 if (length(volc)) {

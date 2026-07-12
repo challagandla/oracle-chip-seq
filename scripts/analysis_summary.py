@@ -80,7 +80,9 @@ def main() -> None:
             f"{int((gate.status=='PASS').sum())} PASS, {n_warn} WARN, {n_fail} FAIL "
             f"(thresholds are per mark; see `results/qc/qc_gate.md`).\n"
         )
-        flagged = gate[gate.flags.fillna("") != ""]
+        # gate["flags"], never gate.flags: DataFrame.flags is a reserved pandas
+        # attribute, so attribute access returns the Flags object, not the column.
+        flagged = gate[gate["flags"].fillna("") != ""]
         if not flagged.empty:
             L.append("Flagged libraries:\n")
             for _, r in flagged.iterrows():
