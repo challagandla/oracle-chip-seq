@@ -27,6 +27,9 @@ dependencies:
   - pandas
   - pyyaml
   - pigz
+  # deepTools 3.5.x still calls numpy.NAN, which numpy 2 removed. Nothing here
+  # needs numpy 2, so the ceiling is cheaper than pinning deepTools back.
+  - numpy<2
 # NOTE: HOMER is deliberately absent. It is academic-use-only and not
 # redistributable; motif enrichment uses monaLisa + JASPAR in envs/r_analysis.yaml.
 # See THIRD_PARTY_LICENSES.md.
