@@ -94,22 +94,45 @@ three hours into an alignment.
 ## Demo dataset
 
 `samples.tsv` points at [GSE277460](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE277460)
-(PRJNA1162470): Jurkat T cells, resting vs anti-CD3/CD28 stimulated, profiled for
-H3K27ac, H3K4me3, H3K27me3 and CTCF with matched inputs — four targets spanning
-punctate histone, broad histone and transcription factor, two conditions, two
-biological replicates each.
+(PRJNA1162470): Jurkat T cells, resting vs anti-CD3/CD28 stimulated, 28 libraries
+over six targets — H3K4me3, H3K27ac (punctate histone), H3K4me1, H3K27me3 (domain
+histone), CTCF (TF), POLR2A (polymerase) — with matched inputs, two conditions,
+two biological replicates each.
 
-Two things about it are worth knowing, because both are common and both are traps:
+It exercises every branch of the registry. It is also, as deposited, mostly
+unusable, and that is the more instructive half:
 
 - **SRA declares every replicate-1 run SINGLE. They are 2×150 paired** (92.7%
   concordant alignment). `samples.tsv` records the true layout, and
   `scripts/fetch_sra.py` fails loudly when the data disagree with the declaration
   rather than silently discarding R2.
-- **The stimulated H3K27ac and H3K4me3 libraries are ~2.2M reads against ~10M for
-  resting.** The QC gate flags this and the summary reports the per-target depth
-  ratio. Normalisation rescales counts but cannot recover information that was
-  never sequenced, so those two contrasts are underpowered in one arm — which
-  looks exactly like biology and is not.
+- **Most ChIP libraries are contaminated with high-GC non-human DNA.** Alignment
+  rate tracks GC content almost perfectly, and the human genome is ~41% GC:
+
+  | library | GC | aligned |
+  |---|---|---|
+  | Input_resting_rep2 | 40.5% | 96.6% |
+  | H3K4me3_resting_rep1 | 51.8% | 53.2% |
+  | CTCF_resting_rep1 | 54.9% | 19.5% |
+  | POLR2A_resting_rep2 | 56.3% | 12.7% |
+
+  Library complexity is normal throughout (NRF 0.76–0.90), so this is not a PCR
+  bottleneck — the reads are simply not human. The QC gate fails 20 of 28
+  libraries on alignment rate and FRiP.
+
+- **The CTCF and H3K27me3 ChIPs did not enrich at all** (FRiP ≈ 0.0000, 0–24
+  peaks). Not a calling artefact: called against genome background alone, with no
+  control and `--nolambda`, H3K27me3 yields 18 "domains" and CTCF 52 peaks, and
+  the top hits sit in pericentromeric satellite.
+
+- **Consequently the contrast is underpowered and returns almost nothing** — one
+  significant region across the cohort, H3K4me3 at *MYC* (log2FC 2.27, padj 7e-4),
+  which is at least the right gene for T-cell activation. Every target has at
+  least one contaminated replicate. This is reported as a failed experiment, not
+  dressed up as an absence of regulation.
+
+The point of shipping it this way: a workflow is only worth as much as its
+behaviour on bad data, and this dataset produces bad data in four different ways.
 
 ## Outputs
 
