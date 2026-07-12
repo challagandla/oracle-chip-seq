@@ -1,31 +1,45 @@
-# Results and temporary files
-results/
+# Data and results never enter the repository. In the reference run both are
+# symlinks to a working directory outside the tree; ignoring the names covers the
+# symlink and a real directory equally.
+/data
+/results
+/references
 .snakemake/
 
-# Raw and intermediate data
-data/raw/
-references/
+# Sequencing data and derived binaries, wherever they land
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.sra
 *.bam
 *.bai
 *.bw
-*.fastq.gz
-*.fq.gz
+*.bigWig
+*.narrowPeak
+*.broadPeak
+*.gappedPeak
 
 # Local FastQ Screen config with site-specific index paths
 config/fastq_screen.conf
 
-# Python artifacts
+# Python
 __pycache__/
 *.pyc
 
-# R artifacts
-*.Rhistory
-*.RData
+# R
+.Rhistory
+.RData
 .Rproj.user/
 
-# Conda environment artifacts
+# Conda / venv
 .env/
 .venv/
+conda/
 
-# OS files
+# Editors and OS
 .DS_Store
+*.swp
+
+# Scratch
+_tmp_*

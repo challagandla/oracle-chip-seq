@@ -1,0 +1,283 @@
+# Peak-mode registry
+# ==================
+# The single source of truth for "is this target narrow or broad", and for what
+# that classification implies downstream. Every rule that behaves differently for
+# punctate vs domain-forming targets reads its parameters from here rather than
+# hard-coding them.
+#
+# Classification follows the ENCODE histone ChIP-seq specification
+# (https://www.encodeproject.org/chip-seq/histone/). Two points are worth
+# spelling out because they are commonly got wrong:
+#
+#   * Acetylation and H3K4me3 are PUNCTATE, not broad. Calling H3K27ac or
+#     H3K4me3 with `macs2 --broad` merges adjacent enhancers/promoters into
+#     multi-kb blocks and destroys the summit structure that motif analysis and
+#     summit-centred differential binding depend on.
+#   * H3K4me1 is BROAD in the ENCODE spec even though it marks enhancers. Its
+#     signal is a wide, low-amplitude shoulder flanking the nucleosome-depleted
+#     region, not a sharp peak.
+#
+# Fields
+# ------
+# class          histone_narrow | histone_broad | tf | polymerase   (descriptive)
+# peak_mode      narrow | broad      -> MACS2 --broad on/off; the master switch
+# macs2          peak-caller settings for this mode
+# reproducibility
+#                idr     -> IDR on ranked narrow peaks (ENCODE, narrow only)
+#                overlap -> naive/pooled overlap (ENCODE uses this for broad marks;
+#                           IDR's rank-consistency model is not valid for the
+#                           low-amplitude, wide peaks broad callers emit)
+# profile        how deepTools summarises signal:
+#                  reference_point -> center of peak (punctate)
+#                  tss             -> reference_point anchored on TSS (promoter marks)
+#                  scale_regions   -> body + flanks (domains, gene-body marks)
+# diffbind       summits: integer -> re-centre on summit +/- N bp (narrow)
+#                         false   -> score the full called interval (broad)
+#                normalize: RLE  -> reads-in-peaks (valid when most peaks are unchanged)
+#                           lib  -> library size / background bins. Broad repressive
+#                                   marks can shift globally, which breaks the
+#                                   "most regions unchanged" assumption RLE needs.
+# motifs         whether de novo/known motif enrichment is meaningful. Sequence-
+#                specific motifs live under sharp summits; scanning a 50 kb
+#                H3K27me3 domain returns the GC content of the domain, not biology.
+# qc             mark-aware acceptance thresholds. A FRiP of 2% is a failure for
+#                H3K4me3 and entirely normal for H3K9me3, so one global cutoff
+#                cannot work. Thresholds follow Landt et al. 2012 (Genome Res
+#                22:1813) and current ENCODE data standards.
+
+defaults:
+  # Applied to any target not listed below. Narrow is the safe default: a punctate
+  # caller on a broad mark loses breadth, whereas a broad caller on a punctate mark
+  # silently fuses distinct regulatory elements, which is the worse failure.
+  class: tf
+  peak_mode: narrow
+  macs2:
+    qvalue: 0.05
+    extra: ""
+  reproducibility: idr
+  profile: reference_point
+  diffbind:
+    summits: 250
+    normalize: RLE
+  motifs:
+    enabled: true
+    size: 200
+  qc:
+    min_frip: 0.01
+    min_peaks: 1000
+    max_peak_width: 10000
+    min_nsc: 1.05
+    min_rsc: 0.8
+
+peak_modes:
+  narrow:
+    macs2_flag: ""
+    peak_ext: narrowPeak
+  broad:
+    macs2_flag: "--broad"
+    peak_ext: broadPeak
+
+marks:
+
+  # ---------------------------------------------------------------- punctate histone
+  # Sharp, nucleosome-scale enrichment. Narrow calling, summit-centred everything.
+
+  H3K4me3:
+    class: histone_narrow
+    peak_mode: narrow
+    description: Active promoters. Sharp, flanks the TSS nucleosome-depleted region.
+    macs2: {qvalue: 0.01, extra: ""}
+    reproducibility: idr
+    profile: tss
+    diffbind: {summits: 250, normalize: RLE}
+    motifs: {enabled: true, size: 200}
+    qc: {min_frip: 0.05, min_peaks: 15000, max_peak_width: 5000, min_nsc: 1.05, min_rsc: 0.8}
+
+  H3K27ac:
+    class: histone_narrow
+    peak_mode: narrow
+    description: Active enhancers and promoters. Punctate; super-enhancers are clusters of narrow peaks, not one broad peak.
+    macs2: {qvalue: 0.05, extra: ""}
+    reproducibility: idr
+    profile: reference_point
+    diffbind: {summits: 250, normalize: RLE}
+    motifs: {enabled: true, size: 200}
+    qc: {min_frip: 0.03, min_peaks: 10000, max_peak_width: 10000, min_nsc: 1.05, min_rsc: 0.8}
+
+  H3K9ac:
+    class: histone_narrow
+    peak_mode: narrow
+    description: Active promoters.
+    macs2: {qvalue: 0.05, extra: ""}
+    reproducibility: idr
+    profile: tss
+    diffbind: {summits: 250, normalize: RLE}
+    motifs: {enabled: true, size: 200}
+    qc: {min_frip: 0.03, min_peaks: 10000, max_peak_width: 5000, min_nsc: 1.05, min_rsc: 0.8}
+
+  H3K4me2:
+    class: histone_narrow
+    peak_mode: narrow
+    description: Promoters and proximal enhancers.
+    macs2: {qvalue: 0.05, extra: ""}
+    reproducibility: idr
+    profile: tss
+    diffbind: {summits: 250, normalize: RLE}
+    motifs: {enabled: true, size: 200}
+    qc: {min_frip: 0.03, min_peaks: 10000, max_peak_width: 5000, min_nsc: 1.05, min_rsc: 0.8}
+
+  H2AFZ:
+    class: histone_narrow
+    peak_mode: narrow
+    description: H2A.Z variant; +1/-1 nucleosomes at promoters.
+    macs2: {qvalue: 0.05, extra: ""}
+    reproducibility: idr
+    profile: tss
+    diffbind: {summits: 250, normalize: RLE}
+    motifs: {enabled: false, size: 200}
+    qc: {min_frip: 0.02, min_peaks: 5000, max_peak_width: 5000, min_nsc: 1.05, min_rsc: 0.8}
+
+  # ------------------------------------------------------------------- broad histone
+  # Domain-forming. Broad calling; scale-regions profiles; no IDR; no motifs;
+  # library-size normalisation because these marks can move globally.
+
+  H3K4me1:
+    class: histone_broad
+    peak_mode: broad
+    description: >-
+      Primed and active enhancers. BROAD in the ENCODE spec despite marking enhancers:
+      the signal is a wide bimodal shoulder around the NDR, not a sharp peak.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.02, min_peaks: 20000, max_peak_width: 100000, min_nsc: 1.02, min_rsc: 0.4}
+
+  H3K27me3:
+    class: histone_broad
+    peak_mode: broad
+    description: >-
+      Polycomb-repressed domains, up to hundreds of kb. Globally responsive to EZH2
+      perturbation, so reads-in-peaks normalisation is unsafe; spike-in is preferred
+      when a global shift is expected.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.01, min_peaks: 5000, max_peak_width: 1000000, min_nsc: 1.02, min_rsc: 0.4}
+
+  H3K9me3:
+    class: histone_broad
+    peak_mode: broad
+    description: Constitutive heterochromatin. Very broad, repeat-rich, low FRiP by nature.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.005, min_peaks: 2000, max_peak_width: 1000000, min_nsc: 1.02, min_rsc: 0.3}
+
+  H3K36me3:
+    class: histone_broad
+    peak_mode: broad
+    description: Transcribed gene bodies; 3'-biased. Profile over gene bodies, not peak centres.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.02, min_peaks: 10000, max_peak_width: 500000, min_nsc: 1.02, min_rsc: 0.4}
+
+  H3K79me2:
+    class: histone_broad
+    peak_mode: broad
+    description: 5' gene bodies of active genes; DOT1L product.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.02, min_peaks: 5000, max_peak_width: 500000, min_nsc: 1.02, min_rsc: 0.4}
+
+  H3K9me2:
+    class: histone_broad
+    peak_mode: broad
+    description: Large organised chromatin K9 domains (LOCKs).
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.005, min_peaks: 2000, max_peak_width: 1000000, min_nsc: 1.02, min_rsc: 0.3}
+
+  H4K20me1:
+    class: histone_broad
+    peak_mode: broad
+    description: Gene bodies of actively transcribed genes.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.02, min_peaks: 5000, max_peak_width: 500000, min_nsc: 1.02, min_rsc: 0.4}
+
+  H3K36me2:
+    class: histone_broad
+    peak_mode: broad
+    description: Broad intergenic domains; NSD1/2 product.
+    macs2: {qvalue: 0.05, broad_cutoff: 0.1, extra: ""}
+    reproducibility: overlap
+    profile: scale_regions
+    diffbind: {summits: false, normalize: lib}
+    motifs: {enabled: false, size: 500}
+    qc: {min_frip: 0.02, min_peaks: 5000, max_peak_width: 1000000, min_nsc: 1.02, min_rsc: 0.4}
+
+  # -------------------------------------------------------------- transcription factors
+  # Sequence-specific binders. Always narrow. Motifs are the primary validation:
+  # a CTCF run whose top de novo motif is not CTCF has failed, regardless of FRiP.
+
+  CTCF:
+    class: tf
+    peak_mode: narrow
+    description: Insulator/architectural factor. Sharpest peaks in the assay; a good positive control for narrow calling.
+    macs2: {qvalue: 0.01, extra: "--call-summits"}
+    reproducibility: idr
+    profile: reference_point
+    diffbind: {summits: 100, normalize: RLE}
+    motifs: {enabled: true, size: 200}
+    qc: {min_frip: 0.02, min_peaks: 20000, max_peak_width: 3000, min_nsc: 1.1, min_rsc: 1.0}
+
+  # ------------------------------------------------------------------------ polymerase
+  # Sharp promoter/pausing peak plus a long elongation tail. Peaks are called narrow
+  # (ENCODE treats POLR2A as a TF-like target) but signal is profiled over gene bodies,
+  # which is why profile and peak_mode are separate fields.
+
+  POLR2A:
+    class: polymerase
+    peak_mode: narrow
+    description: RNA Pol II. Narrow promoter-proximal pausing peak; elongation signal spans the gene body.
+    macs2: {qvalue: 0.01, extra: "--call-summits"}
+    reproducibility: idr
+    profile: scale_regions
+    diffbind: {summits: 250, normalize: RLE}
+    motifs: {enabled: false, size: 200}
+    qc: {min_frip: 0.02, min_peaks: 8000, max_peak_width: 10000, min_nsc: 1.05, min_rsc: 0.8}
+
+# Aliases: how targets are actually spelled in GEO/SRA metadata.
+aliases:
+  H3K27AC: H3K27ac
+  H3K4ME3: H3K4me3
+  H3K4ME1: H3K4me1
+  H3K27ME3: H3K27me3
+  H3K9ME3: H3K9me3
+  H3K36ME3: H3K36me3
+  H2A.Z: H2AFZ
+  H2AZ: H2AFZ
+  POL2: POLR2A
+  POLII: POLR2A
+  RNAPOLII: POLR2A
+  RNAPII: POLR2A
+  "RNA POLII": POLR2A
+  POL2RA: POLR2A

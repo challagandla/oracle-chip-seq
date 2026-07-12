@@ -1,0 +1,13 @@
+name: idr
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # IDR's last release is pinned to python <=3.10, which conflicts with the rest
+  # of the toolchain. Isolating it is cheaper than holding the whole stack back.
+  - python=3.10
+  - idr=2.0.4.2
+  # IDR calls numpy.int, an alias numpy removed in 1.24. The last IDR release
+  # predates that and will never be fixed upstream, so the pin belongs here.
+  - numpy<1.24
+  - bedtools=2.31.1
