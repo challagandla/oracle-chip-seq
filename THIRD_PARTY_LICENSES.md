@@ -18,7 +18,7 @@ with citation. There are **no academic-only, non-commercial, or non-redistributa
 | SRA Toolkit | public domain (US Gov) | FASTQ retrieval |
 | Bowtie2 | GPL-3.0 | alignment |
 | samtools / bedtools | MIT / GPL-2 | bam/interval ops |
-| MACS2 | BSD-3-Clause | peak calling |
+| MACS3 | BSD-3-Clause | peak calling |
 | IDR | GPL-2.0 | narrow-peak reproducibility |
 | Subread (featureCounts) | GPL-3.0 | read counting in peaks |
 | deepTools | GPL-3.0 | coverage/QC |

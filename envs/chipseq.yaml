@@ -11,7 +11,15 @@ dependencies:
   - bowtie2=2.5.4
   - samtools=1.21
   - bedtools=2.31.1
-  - macs2=2.2.9.1
+  # MACS3, not MACS2. Two reasons, one of them fatal:
+  #   * the bioconda macs2 2.2.x binaries are linked against __log_finite, a libm
+  #     symbol glibc dropped at 2.27. On any current distribution MACS2 dies at
+  #     `import MACS2.IO.ScoreTrack` with an undefined-symbol ImportError, before
+  #     it has parsed a single argument.
+  #   * MACS2 is end-of-life. MACS3 is the same peak-calling model by the same lab,
+  #     and `callpeak` takes the same flags (--broad, --broad-cutoff,
+  #     --call-summits, --format BAMPE, --nomodel --extsize, -q/-p, --keep-dup).
+  - macs3=3.0.3
   - deeptools=3.5.5
   - subread                # featureCounts
   - pygenometracks         # browser snapshots
@@ -19,7 +27,6 @@ dependencies:
   - pandas
   - pyyaml
   - pigz
-  - numpy<2                # macs2 2.2.x is not built against the numpy 2 ABI
 # NOTE: HOMER is deliberately absent. It is academic-use-only and not
 # redistributable; motif enrichment uses monaLisa + JASPAR in envs/r_analysis.yaml.
 # See THIRD_PARTY_LICENSES.md.

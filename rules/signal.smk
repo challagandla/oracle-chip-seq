@@ -72,8 +72,17 @@ rule bigwig_log2ratio:
         frag=$(awk 'NR==2 {{print $3}}' {input.frag})
         layout=$(awk 'NR==2 {{print $2}}' {input.frag})
         if [ "$layout" = "paired" ]; then ext="--extendReads"; else ext="--extendReads $frag"; fi
+        # CPM rather than SES. SES estimates the ChIP/Input scale factor from the
+        # median coverage of sampled background bins; in a shallow library that
+        # median is zero and bamCompare aborts ("median coverage computed is
+        # zero"), which is exactly what the ~2M-read arm of this cohort does. SES
+        # is also unusable piecemeal: applying it to the libraries where it happens
+        # to converge and something else elsewhere would make the tracks
+        # non-comparable, which is the one thing these tracks exist to be. CPM is
+        # depth-independent and defined for every library.
         bamCompare -b1 {input.chip} -b2 {input.control} -o {output.bw} \
-            --operation log2 --scaleFactorsMethod SES \
+            --operation log2 \
+            --scaleFactorsMethod None --normalizeUsing CPM \
             --pseudocount 1 \
             --binSize {params.binsize} \
             --effectiveGenomeSize {params.egs} \

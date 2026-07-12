@@ -26,14 +26,18 @@ def _frag(sample):
 
 
 def _macs2_cmd(sample, treat_bam, ctrl_bam, outdir, name, frag_tsv):
-    """Build the MACS2 invocation for one sample from the registry.
+    """Build the peak-caller invocation for one sample from the registry.
 
     Kept in Python rather than shell so the peak mode, the q-value and the
     single-end fragment size are all resolved in one place.
+
+    The binary is macs3: MACS2 is end-of-life and its bioconda builds no longer
+    load on current glibc. `callpeak` is flag-compatible, so the registry-derived
+    arguments are unchanged. See envs/chipseq.yaml.
     """
     return (
         f'frag=$(awk \'NR==2 {{print $3}}\' {frag_tsv}); '
-        f"macs2 callpeak -t {treat_bam} -c {ctrl_bam} "
+        f"macs3 callpeak -t {treat_bam} -c {ctrl_bam} "
         f"--name {name} --outdir {outdir} "
         f"$(python3 scripts/macs2_args.py --target {target_of(sample)} "
         f"--gsize {REF['gsize']} --paired {int(is_paired(sample))} --extsize $frag)"
@@ -123,7 +127,7 @@ rule macs2_relaxed:
         frag=$(awk 'NR==2 {{print $3}}' {input.frag})
         extra=""
         if [ -n "{params.nomodel}" ]; then extra="{params.nomodel} $frag"; fi
-        macs2 callpeak -t {input.bam} -c {input.control} \
+        macs3 callpeak -t {input.bam} -c {input.control} \
             --name {wildcards.sample} --outdir results/peaks/relaxed \
             --format {params.fmt} --gsize {params.gsize} \
             --pvalue 0.01 --keep-dup all $extra > {log} 2>&1
@@ -236,7 +240,7 @@ rule macs2_pooled:
         frag=$(awk 'NR==2 {{print $3}}' {input.frag})
         args=$(python3 scripts/macs2_args.py --target {params.target} \
                  --gsize {params.gsize} --paired 0 --extsize $frag)
-        macs2 callpeak -t {input.bam} -c {input.control} \
+        macs3 callpeak -t {input.bam} -c {input.control} \
             --name {wildcards.target}_{wildcards.condition} \
             --outdir results/peaks/pooled $args > {log} 2>&1
         """

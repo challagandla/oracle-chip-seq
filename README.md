@@ -13,11 +13,11 @@ the peak caller, so the classification lives in one file,
 | | narrow | broad |
 |---|---|---|
 | examples | H3K4me3, H3K27ac, H3K9ac, H3K4me2, H2A.Z, CTCF and other TFs | H3K4me1, H3K27me3, H3K9me3, H3K36me3, H3K79me2, H4K20me1 |
-| peak caller | `macs2` default | `macs2 --broad --broad-cutoff` |
+| peak caller | `macs3 callpeak` default | `macs3 callpeak --broad --broad-cutoff` |
 | reproducibility | IDR across replicates | naive overlap against pooled-replicate peaks |
 | width filter | drop peaks above a few kb (artefacts) | allow domains up to 1 Mb |
 | profile geometry | reference-point on the summit, or on the TSS for promoter marks | scale-regions across the domain body |
-| counting window | fixed window on the MACS2 summit | the full called interval |
+| counting window | fixed window on the called summit | the full called interval |
 | size factors | median-of-ratios on peak counts | genome-wide background bins |
 | motif enrichment | yes | no |
 | FRiP and depth floors | per mark | per mark |
@@ -62,7 +62,7 @@ python3 scripts/marks.py H3K27me3    # one target, fully resolved
 ## Steps
 
 FASTQ (SRA or local) → FastQC → Trim Galore → bowtie2 → filter (MAPQ ≥ 30, primary
-chromosomes, proper pairs, deduplicate) → fragment-length estimate → MACS2 (mode
+chromosomes, proper pairs, deduplicate) → fragment-length estimate → MACS3 (mode
 from the registry) → blacklist and width filter → IDR or naive overlap →
 per-target consensus → featureCounts → DESeq2 → ChIPseeker and GO →
 monaLisa/JASPAR motifs → figures, browser tracks, MultiQC, QC gate.
