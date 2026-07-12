@@ -189,10 +189,14 @@ write.table(out, file.path(opt$outdir, "results.tsv"),
 bed_cols <- c("chr", "start", "end", "region", "log2FoldChange", "strand")
 for (dir in c("up", "down")) {
   sel <- out[out$direction == dir, ]
+  # rep(".", nrow(sel)), not ".": a scalar recycles fine against non-empty
+  # columns but has length 1 against zero-length ones, and data.frame() then
+  # refuses to build ("differing number of rows: 0, 1"). A direction with no
+  # significant peaks is an ordinary result, not an error.
   bed <- data.frame(chr = sel$chr, start = sel$start, end = sel$end,
                     region = sel$region, score = round(sel$log2FoldChange, 3),
-                    strand = ".")
-  bed <- bed[order(bed$chr, bed$start), ]
+                    strand = rep(".", nrow(sel)))
+  bed <- bed[order(bed$chr, bed$start), , drop = FALSE]
   write.table(bed, file.path(opt$outdir, paste0(dir, ".bed")),
               sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
 }
