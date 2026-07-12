@@ -232,6 +232,16 @@ rule compute_matrix:
         r"""
         set -euo pipefail
         mkdir -p results/profiles $(dirname {log})
+
+        # No regions means the ChIP for this target failed. computeMatrix treats an
+        # empty -R as an error; emit an empty matrix instead so the targets that
+        # worked still reach their figures. plot_profile renders a placeholder.
+        if [ ! -s {input.regions} ]; then
+            echo "no regions for {wildcards.target}: the ChIP did not enrich" > {log}
+            : | gzip -c > {output.matrix}
+            exit 0
+        fi
+
         case "{params.mode}" in
           scale_regions)
             computeMatrix scale-regions -S {input.bws} -R {input.regions} \
@@ -272,6 +282,27 @@ rule plot_profile:
         r"""
         set -euo pipefail
         mkdir -p results/profiles $(dirname {log})
+
+        # Empty matrix = no peaks for this target (see compute_matrix). Render a
+        # placeholder that says so, rather than leaving a gap that reads as an
+        # oversight or failing the run outright.
+        if [ ! -s {input.matrix} ] || [ "$(gzip -dc {input.matrix} | head -c 1 | wc -c)" -eq 0 ]; then
+            echo "empty matrix for {wildcards.target}: no peaks" > {log}
+            python3 - <<PY
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+for path in ("{output.heatmap}", "{output.profile}"):
+    fig, ax = plt.subplots(figsize=(5, 3))
+    ax.axis("off")
+    ax.text(0.5, 0.5, "{wildcards.target}: no peaks called\\nthe ChIP did not enrich\\nsee results/qc/qc_gate.tsv",
+            ha="center", va="center", fontsize=11)
+    fig.savefig(path, format="pdf", bbox_inches="tight")
+    plt.close(fig)
+PY
+            exit 0
+        fi
+
         if [ "{params.mode}" = "scale_regions" ]; then
             startlab="start"; endlab="end"
         else

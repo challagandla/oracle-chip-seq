@@ -63,6 +63,32 @@ read_bed <- function(path) {
 consensus <- read_bed(opt$consensus)
 message(sprintf("  %d consensus peaks", length(consensus)))
 
+# No peaks means the ChIP failed. ChIPseeker cannot annotate an empty interval
+# set, but that is not a reason to abort the run: write the outputs empty so the
+# targets that worked still reach their figures, and let the QC gate say why.
+if (length(consensus) == 0) {
+  message(sprintf("[%s] no consensus peaks; writing empty annotation.", opt$target))
+  write.table(data.frame(chr = character(0), start = integer(0), end = integer(0),
+                         annotation = character(0), SYMBOL = character(0),
+                         distanceToTSS = integer(0)),
+              file.path(opt$outdir, "peak_annotation.tsv"),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+  write.table(data.frame(gene = character(0), direction = character(0)),
+              file.path(opt$outdir, "differential_genes.tsv"),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+  write.table(data.frame(ID = character(0), Description = character(0),
+                         GeneRatio = character(0), pvalue = numeric(0),
+                         p.adjust = numeric(0), direction = character(0)),
+              file.path(opt$outdir, "go_enrichment.tsv"),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+  pdf(file.path(opt$outdir, "feature_distribution.pdf"), width = 6, height = 4)
+  plot.new()
+  title(main = sprintf("%s: no peaks called", opt$target))
+  text(0.5, 0.5, "ChIP did not enrich\nsee results/qc/qc_gate.tsv", cex = 1.1)
+  dev.off()
+  quit(save = "no", status = 0)
+}
+
 # ------------------------------------------------------- feature distribution
 #
 # Where a mark sits relative to gene structure is the first sanity check of the

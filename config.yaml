@@ -52,6 +52,9 @@ peaks:
   idr_threshold: 0.05
   # Reciprocal overlap required for a peak to count as reproduced.
   overlap_fraction: 0.5
+  # Below this many peaks in a replicate there is nothing for IDR's mixture model
+  # to fit. The target is reported as a failed ChIP rather than aborting the run.
+  min_peaks_for_idr: 100
 
 signal:
   bin_size: 25

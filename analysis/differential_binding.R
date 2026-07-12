@@ -58,6 +58,31 @@ message(sprintf("[%s] peak_mode=%s  normalisation=%s", opt$target, peak_mode, no
 # ------------------------------------------------------------------ load counts
 
 counts <- read.delim(opt$counts, check.names = FALSE)
+
+# A target whose ChIP did not enrich arrives here with no regions. There is
+# nothing to test, but the run must not die: the other targets are unaffected and
+# their results are still wanted. Write the full set of empty outputs so the DAG
+# completes, and let the QC gate and the summary report why this target is empty.
+if (nrow(counts) == 0) {
+  message(sprintf(
+    "[%s] no consensus peaks - the ChIP did not enrich. Writing empty results.",
+    opt$target))
+  empty <- data.frame(
+    region = character(0), chrom = character(0), start = integer(0),
+    end = integer(0), baseMean = numeric(0), log2FoldChange = numeric(0),
+    lfcSE = numeric(0), pvalue = numeric(0), padj = numeric(0),
+    direction = character(0))
+  write.table(empty, file.path(opt$outdir, "results.tsv"),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+  for (d in c("up", "down")) {
+    cat("", file = file.path(opt$outdir, paste0(d, ".bed")))
+  }
+  for (f in c("normalized_counts.tsv", "rlog.tsv", "size_factors.tsv")) {
+    cat("", file = file.path(opt$outdir, f))
+  }
+  quit(save = "no", status = 0)
+}
+
 rownames(counts) <- counts$region
 counts$region <- NULL
 

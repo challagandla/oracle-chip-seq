@@ -19,3 +19,11 @@ CTCF_resting_rep1	SRR35556592	CTCF	chip	resting	1	Input_resting_rep1	paired	Jurk
 CTCF_resting_rep2	SRR35551251	CTCF	chip	resting	2	Input_resting_rep2	paired	Jurkat
 CTCF_stimulated_rep1	SRR35556599	CTCF	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
 CTCF_stimulated_rep2	SRR35551244	CTCF	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat
+H3K4me1_resting_rep1	SRR35556588	H3K4me1	chip	resting	1	Input_resting_rep1	paired	Jurkat
+H3K4me1_resting_rep2	SRR35551255	H3K4me1	chip	resting	2	Input_resting_rep2	paired	Jurkat
+H3K4me1_stimulated_rep1	SRR35556595	H3K4me1	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
+H3K4me1_stimulated_rep2	SRR35551248	H3K4me1	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat
+POLR2A_resting_rep1	SRR35556591	POLR2A	chip	resting	1	Input_resting_rep1	paired	Jurkat
+POLR2A_resting_rep2	SRR35551252	POLR2A	chip	resting	2	Input_resting_rep2	paired	Jurkat
+POLR2A_stimulated_rep1	SRR35556598	POLR2A	chip	stimulated	1	Input_stimulated_rep1	paired	Jurkat
+POLR2A_stimulated_rep2	SRR35551245	POLR2A	chip	stimulated	2	Input_stimulated_rep2	paired	Jurkat

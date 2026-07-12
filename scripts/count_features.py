@@ -64,6 +64,24 @@ def main() -> None:
     if not se and not pe:
         sys.exit("No BAMs given")
 
+    # A target whose ChIP failed reaches here with an empty region set, and
+    # featureCounts treats an annotation with no features as a fatal error. That is
+    # the wrong response: one dead antibody should not take down the targets that
+    # worked. Emit an empty count matrix with the right columns and let the
+    # differential step decide what to do with it.
+    saf_rows = sum(
+        1
+        for i, line in enumerate(open(args.saf))
+        if i and line.strip()
+    )
+    if saf_rows == 0:
+        cols = ["region"] + [
+            Path(b).name.replace(".filtered.bam", "") for b in (se + pe)
+        ]
+        pd.DataFrame(columns=cols).to_csv(args.out, sep="\t", index=False)
+        print(f"0 regions: no peaks for this target; wrote an empty count matrix")
+        return
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         frames = []

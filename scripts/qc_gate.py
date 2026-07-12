@@ -221,7 +221,10 @@ def main() -> None:
                 vals.append("" if pd.isna(v) else str(v))
             fh.write("| " + " | ".join(vals) + " |\n")
 
-        flagged = out[out.flags != ""]
+        # out["flags"], never out.flags: DataFrame.flags is a reserved pandas
+        # attribute (the Flags object), so attribute access silently returns that
+        # instead of the column and the comparison degenerates to a scalar True.
+        flagged = out[out["flags"] != ""]
         if not flagged.empty:
             fh.write("\n## Flags\n\n")
             for _, r in flagged.iterrows():

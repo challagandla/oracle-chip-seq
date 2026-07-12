@@ -262,6 +262,7 @@ rule idr_narrow:
         target="|".join(re.escape(t) for t in IDR_TARGETS) if IDR_TARGETS else "$^",
     params:
         thr=config["peaks"]["idr_threshold"],
+        min_peaks=config["peaks"].get("min_peaks_for_idr", 100),
     log:
         "results/logs/idr/{target}_{condition}.log",
     conda:
@@ -270,6 +271,29 @@ rule idr_narrow:
         r"""
         set -euo pipefail
         mkdir -p results/peaks/idr results/peaks/reproducible $(dirname {log})
+
+        # Do not let ~/.local/lib/pythonX.Y/site-packages precede the conda env.
+        # The user site directory is searched before env site-packages, so a numpy
+        # installed there shadows the pinned one and IDR dies on numpy.int. Same
+        # class of leak as ~/.Rprofile shadowing the conda R.
+        export PYTHONNOUSERSITE=1
+
+        # IDR fits a two-component mixture to the rank correspondence of two peak
+        # lists. With a handful of peaks there is nothing to fit and it aborts. A
+        # failed ChIP is a normal outcome, not a reason to take the whole run down:
+        # emit an empty reproducible set, say so, and let the QC gate carry the
+        # verdict into the summary.
+        for f in {input.reps}; do
+            n=$(wc -l < "$f")
+            if [ "$n" -lt {params.min_peaks} ]; then
+                echo "$(basename $f): $n peaks (< {params.min_peaks}); too few for IDR." > {log}
+                echo "The ChIP did not enrich. Emitting an empty reproducible set." >> {log}
+                : > {output.idr}
+                : > {output.bed}
+                exit 0
+            fi
+        done
+
         idr --samples {input.reps} \
             --input-file-type narrowPeak --rank p.value \
             --output-file {output.idr} \
