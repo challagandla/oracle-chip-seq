@@ -152,8 +152,18 @@ res <- results(dds,
                contrast = c("condition", opt$treatment, opt$reference),
                alpha = opt$fdr)
 
-# Shrink the log2 fold changes. Low-count peaks otherwise produce enormous,
-# meaningless fold changes that dominate every volcano plot.
+# Keep the maximum-likelihood estimate before any shrinkage. The effect-size
+# filter is applied to THIS, not to the shrunk value.
+#
+# Shrinkage is a prior on the fold change, and when dispersion is high the prior
+# can collapse: apeglm then returns log2FC ~ 1e-5 with lfcSE ~ 1e-3 for every
+# region, a point mass at zero. Thresholding |log2FC| >= 1 on that silently
+# deletes every true positive, and the failure is invisible because the table
+# still looks well-formed. The Wald p-values are computed from the MLE and are
+# unaffected, so pairing padj with the MLE effect size keeps the call honest.
+# The shrunk value is still reported and still used for plotting, which is what
+# it is good for.
+res_mle <- res
 res <- tryCatch(
   lfcShrink(dds, coef = paste0("condition_", opt$treatment, "_vs_", opt$reference),
             res = res, type = "apeglm", quiet = TRUE),
@@ -174,13 +184,16 @@ rownames(regions) <- regions$region
 
 out <- as.data.frame(res)
 out$region <- rownames(out)
+out$log2FoldChange_MLE <- as.numeric(res_mle[rownames(out), "log2FoldChange"])
 out <- merge(regions[, c("region", "chr", "start", "end")], out, by = "region")
 
 # The call needs an effect size as well as an FDR: with enough depth, ChIP-seq
-# will return a significant q-value for a 1.1x change that means nothing.
-out$significant <- !is.na(out$padj) & out$padj < opt$fdr & abs(out$log2FoldChange) >= opt$lfc
+# will return a significant q-value for a 1.1x change that means nothing. The
+# effect size is the unshrunk MLE, for the reason given above.
+out$significant <- !is.na(out$padj) & out$padj < opt$fdr &
+  abs(out$log2FoldChange_MLE) >= opt$lfc
 out$direction <- ifelse(!out$significant, "ns",
-                 ifelse(out$log2FoldChange > 0, "up", "down"))
+                 ifelse(out$log2FoldChange_MLE > 0, "up", "down"))
 
 out <- out[order(out$padj, -abs(out$log2FoldChange)), ]
 write.table(out, file.path(opt$outdir, "results.tsv"),
@@ -194,7 +207,7 @@ for (dir in c("up", "down")) {
   # refuses to build ("differing number of rows: 0, 1"). A direction with no
   # significant peaks is an ordinary result, not an error.
   bed <- data.frame(chr = sel$chr, start = sel$start, end = sel$end,
-                    region = sel$region, score = round(sel$log2FoldChange, 3),
+                    region = sel$region, score = round(sel$log2FoldChange_MLE, 3),
                     strand = rep(".", nrow(sel)))
   bed <- bed[order(bed$chr, bed$start), , drop = FALSE]
   write.table(bed, file.path(opt$outdir, paste0(dir, ".bed")),

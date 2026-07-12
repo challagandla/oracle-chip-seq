@@ -249,7 +249,11 @@ if (length(volc)) {
     mutate(target = factor(target, levels = target_levels),
            negLog = -log10(pmax(padj, 1e-300)))
 
-  p4 <- ggplot(V, aes(log2FoldChange, negLog, colour = direction)) +
+  # Plot the unshrunk MLE: the dashed effect-size lines are the threshold the call
+  # is actually made on, and when shrinkage collapses (high dispersion drives the
+  # apeglm prior to a point mass at zero) the shrunk values pile onto x = 0 and the
+  # volcano becomes a vertical stripe that says nothing about the data.
+  p4 <- ggplot(V, aes(log2FoldChange_MLE, negLog, colour = direction)) +
     geom_point(size = 0.35, alpha = 0.6) +
     geom_vline(xintercept = c(-cfg$differential$min_lfc, cfg$differential$min_lfc),
                linetype = "22", linewidth = 0.25, colour = "grey50") +
