@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create runner environment
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: environment.runner.yml
+          cache-environment: true
+
+      - name: Run static checks
+        shell: bash -el {0}
+        run: |
+          ruff check scripts tests
+          ruff format --check scripts tests
+          python -m py_compile scripts/*.py tests/*.py
+          python -c 'from pathlib import Path; import yaml; files = [Path("config.yaml"), Path("config.sample.yaml"), Path("environment.runner.yml"), *Path("envs").glob("*.yaml")]; [yaml.safe_load(path.read_text()) for path in files]'
+          bash -n setup.sh run.sh make_config.sh prepare_references.sh
+          git diff --check
+
+      - name: Run test suite
+        shell: bash -el {0}
+        run: python -m pytest -q

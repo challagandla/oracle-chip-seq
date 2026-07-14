@@ -10,7 +10,9 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 
-motifs <- read_tsv(homer_file, comment = "#", col_names = TRUE, show_col_types = FALSE)
+# HOMER column names themselves contain '#', so treating it as a comment marker
+# truncates the header and silently corrupts the trailing columns.
+motifs <- read_tsv(homer_file, col_names = TRUE, show_col_types = FALSE)
 names(motifs) <- make.names(names(motifs), unique = TRUE)
 
 if (!"Motif.Name" %in% colnames(motifs)) {
@@ -20,9 +22,26 @@ if (!"P.value" %in% colnames(motifs)) {
     stop("Expected a P-value column in HOMER results")
 }
 
+if ("Log.P.value" %in% colnames(motifs)) {
+    motifs <- motifs %>%
+        mutate(
+            P.value = suppressWarnings(as.numeric(P.value)),
+            Log.P.value = suppressWarnings(as.numeric(Log.P.value)),
+            # HOMER reports the natural log; convert to the plotted -log10 scale.
+            logP = -Log.P.value / log(10)
+        )
+} else {
+    # Older HOMER tables may omit Log P-value. Keep underflowed values instead
+    # of dropping the strongest motifs, while acknowledging double precision.
+    motifs <- motifs %>%
+        mutate(
+            P.value = suppressWarnings(as.numeric(P.value)),
+            logP = -log10(pmax(P.value, .Machine$double.xmin))
+        )
+}
+
 top_motifs <- motifs %>%
-    mutate(P.value = as.numeric(P.value), logP = -log10(P.value)) %>%
-    filter(!is.na(logP), is.finite(logP)) %>%
+    filter(!is.na(logP), is.finite(logP), logP >= 0) %>%
     arrange(desc(logP)) %>%
     slice_head(n = 20)
 

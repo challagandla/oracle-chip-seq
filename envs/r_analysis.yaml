@@ -2,10 +2,10 @@ name: r_analysis
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
-  - r-base=4.3
-  - bioconductor-diffbind
-  - r-ggplot2
-  - r-readr
-  - r-dplyr
+  - r-base=4.3.*
+  - bioconductor-diffbind=3.12.*
+  - r-ggplot2=3.5.*
+  - r-readr=2.1.*
+  - r-dplyr=1.1.*
