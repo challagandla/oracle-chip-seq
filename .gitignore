@@ -1,10 +1,14 @@
+# Local-only pipeline workspaces
+/instructions/
+/data/
+/cohorts/
+/results/
+
 # Results and temporary files
-results/
 .snakemake/
 
 # Raw and intermediate data
-data/raw/
-references/
+/references/
 *.bam
 *.bai
 *.bw
@@ -29,3 +33,21 @@ __pycache__/
 
 # OS files
 .DS_Store
+
+# Local scratch / temp working files
+_tmp_config.yaml
+_tmp_refs/
+
+# Local development metadata
+/AGENTS.md
+/CLAUDE.md
+/MEMORY.md
+/memory.md
+/handoff*.md
+.claude/
+.codex/
+.gitnexus/
+.graphifyignore
+graphify-out/
+.gitignore.bak-*
+.cache/

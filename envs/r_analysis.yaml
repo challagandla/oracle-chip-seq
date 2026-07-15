@@ -2,18 +2,21 @@ name: r_analysis
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
-  - r-base=4.3
-  - bioconductor-diffbind
-  - bioconductor-monalisa
-  - bioconductor-jaspar2020
-  - bioconductor-tfbstools
-  - bioconductor-genomicranges
-  - bioconductor-rtracklayer
-  - bioconductor-rsamtools
-  - bioconductor-biostrings
-  - bioconductor-summarizedexperiment
-  - r-ggplot2
-  - r-readr
-  - r-dplyr
+  - r-base=4.3.*
+  - bioconductor-diffbind=3.12.*
+  - bioconductor-monalisa=1.8.0
+  - bioconductor-jaspar2020=0.99.10
+  - bioconductor-tfbstools=1.40.*
+  - bioconductor-genomicranges=1.54.*
+  - bioconductor-genomeinfodb=1.38.*
+  - bioconductor-iranges=2.36.*
+  - bioconductor-rtracklayer=1.62.*
+  - bioconductor-rsamtools=2.18.*
+  - bioconductor-biostrings=2.70.*
+  - bioconductor-summarizedexperiment=1.32.*
+  - bioconductor-biocparallel=1.36.*
+  - r-ggplot2=3.5.*
+  - r-readr=2.1.*
+  - r-dplyr=1.1.*

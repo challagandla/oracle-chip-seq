@@ -2,19 +2,22 @@ name: chipseq
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
   - python=3.11
-  - snakemake
-  - fastqc
-  - trim-galore
-  - bowtie2
-  - samtools
-  - bedtools
-  - macs2
-  - deeptools
-  - fastq-screen
-  - multiqc
-  - wget
-  - pandas
-  - pyyaml
+  - snakemake-minimal=9.22.*
+  - fastqc=0.12.1
+  - trim-galore=0.6.10
+  - bowtie2=2.5.4
+  - samtools=1.20
+  - bedtools=2.31.1
+  - macs3=3.0.3
+  - deeptools=3.5.5
+  # deepTools 3.5.x still uses numpy.NAN, which NumPy 2 removed.
+  - numpy=1.26.*
+  - fastq-screen=0.15.3
+  - multiqc=1.25
+  - wget=1.21.4
+  - gzip
+  - pandas=2.2.*
+  - pyyaml=6.*

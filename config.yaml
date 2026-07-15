@@ -8,6 +8,9 @@ references:
     bt2_index: "/path/to/hg38"
     name: "hg38"
     gsize: "2.7e9"
+    # Example for 150-bp uniquely mapped GRCh38 reads. Recalculate for the
+    # assembly, read length, and mapping policy used in the experiment.
+    effective_genome_size: 2862010428
   mouse:
     genome: "/path/to/mm39.fa"
     chrom_sizes: "/path/to/mm39.chrom.sizes"
@@ -15,6 +18,8 @@ references:
     bt2_index: "/path/to/mm39"
     name: "mm39"
     gsize: "1.87e9"
+    # Example for 150-bp uniquely mapped GRCm39 reads.
+    effective_genome_size: 2495461690
   rat:
     genome: "/path/to/rn6.fa"
     chrom_sizes: "/path/to/rn6.chrom.sizes"
@@ -22,25 +27,69 @@ references:
     bt2_index: "/path/to/rn6"
     name: "rn6"
     gsize: "2.53e9"
+    # No universal rn6 value is safe under MAPQ filtering; replace before use.
+    effective_genome_size: 0
 
 contamination:
-  fastq_screen_conf: "config/fastq_screen.conf.example"
+  fastq_screen_conf: "config/fastq_screen.conf"
   subset: 100000
+
+alignment:
+  min_mapq: 30
+  max_insert_size: 2000
+
+peak_calling:
+  narrow_qvalue: 0.01
+  broad_cutoff: 0.1
+  consensus_min_replicates: 2
+
+differential_binding:
+  numerator_condition: treated
+  reference_condition: control
+  narrow_summits: 200
+
+motif_enrichment:
+  window_bp: 200
+  background_multiplier: 2
+  seed: 1
+
+deeptools:
+  threads: 4
+  track_bin_size: 25
+  matrix_bin_size: 50
+  reference_point_upstream: 3000
+  reference_point_downstream: 3000
+  scale_regions_upstream: 3000
+  scale_regions_downstream: 3000
+  scale_regions_body_length: 5000
+  log2_pseudocount: 1
+  log2_scale_method: "None"  # independently CPM-normalize IP and input
+  heatmap_color_map: "RdBu_r"
+  heatmap_z_min: -2
+  heatmap_z_max: 2
+  plot_dpi: 200
+  # Optional display-only overrides keyed by the original factor name:
+  # factor_modes:
+  #   H3K27ac: reference_point
 
 chip_controls:
   - id: Input_control_rep1
+    condition: control
     fastq:
       - data/raw/Input_control_rep1_R1.fastq.gz
       - data/raw/Input_control_rep1_R2.fastq.gz
   - id: Input_control_rep2
+    condition: control
     fastq:
       - data/raw/Input_control_rep2_R1.fastq.gz
       - data/raw/Input_control_rep2_R2.fastq.gz
   - id: Input_treated_rep1
+    condition: treated
     fastq:
       - data/raw/Input_treated_rep1_R1.fastq.gz
       - data/raw/Input_treated_rep1_R2.fastq.gz
   - id: Input_treated_rep2
+    condition: treated
     fastq:
       - data/raw/Input_treated_rep2_R1.fastq.gz
       - data/raw/Input_treated_rep2_R2.fastq.gz
@@ -54,7 +103,8 @@ chip_samples:
     condition: control
     replicate: 1
     factor: H3K27ac
-    tissue: example
+    tissue: K562
+    peak_mode: narrow  # geometry, not assay class; H3K27ac is punctate
   - id: H3K27ac_control_rep2
     fastq:
       - data/raw/H3K27ac_control_rep2_R1.fastq.gz
@@ -63,7 +113,8 @@ chip_samples:
     condition: control
     replicate: 2
     factor: H3K27ac
-    tissue: example
+    tissue: K562
+    peak_mode: narrow
   - id: H3K27ac_treated_rep1
     fastq:
       - data/raw/H3K27ac_treated_rep1_R1.fastq.gz
@@ -72,7 +123,8 @@ chip_samples:
     condition: treated
     replicate: 1
     factor: H3K27ac
-    tissue: example
+    tissue: K562
+    peak_mode: narrow
   - id: H3K27ac_treated_rep2
     fastq:
       - data/raw/H3K27ac_treated_rep2_R1.fastq.gz
@@ -81,4 +133,5 @@ chip_samples:
     condition: treated
     replicate: 2
     factor: H3K27ac
-    tissue: example
+    tissue: K562
+    peak_mode: narrow

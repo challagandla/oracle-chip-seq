@@ -1,0 +1,18 @@
+name: oracle-chip-runner
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.11
+  - snakemake-minimal=9.22.*
+  - snakemake-executor-plugin-cluster-generic
+  - pandas=2.2.*
+  - pyyaml=6.*
+  - conda>=24.7
+  - conda-libmamba-solver
+  - mamba
+  - graphviz
+  - pytest
+  - ruff=0.15.*
+  - tabulate
